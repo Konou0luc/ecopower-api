@@ -356,6 +356,66 @@ const setDeviceToken = async (req, res) => {
   }
 };
 
+// Mot de passe oublié (pour tous les utilisateurs, sans authentification)
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, telephone } = req.body;
+
+    // Vérifier qu'au moins un identifiant est fourni
+    if (!email && !telephone) {
+      return res.status(400).json({ message: 'Email ou téléphone requis' });
+    }
+
+    // Rechercher l'utilisateur par email ou téléphone
+    let user;
+    if (email) {
+      user = await User.findOne({ email: email.trim().toLowerCase() });
+    } else {
+      user = await User.findOne({ telephone: telephone.trim() });
+    }
+
+    // Ne pas révéler si l'utilisateur existe ou non pour des raisons de sécurité
+    if (!user) {
+      // Retourner un message de succès même si l'utilisateur n'existe pas
+      return res.json({
+        message: 'Si un compte existe avec cet email/téléphone, un nouveau mot de passe temporaire a été généré.'
+      });
+    }
+
+    // Générer un nouveau mot de passe temporaire
+    const motDePasseTemporaire = generateTemporaryPassword();
+
+    // Mettre à jour le mot de passe et réinitialiser firstLogin
+    user.motDePasse = motDePasseTemporaire;
+    user.firstLogin = true;
+    await user.save();
+
+    // Envoyer le nouveau mot de passe via WhatsApp (simulation)
+    // En production, vous pourriez envoyer un email ou un SMS
+    try {
+      const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
+      await sendWhatsAppCredentials(
+        user.telephone,
+        user.email,
+        motDePasseTemporaire
+      );
+    } catch (e) {
+      console.error('Erreur lors de l\'envoi WhatsApp:', e);
+    }
+
+    // En production, ne pas retourner le mot de passe dans la réponse
+    // Pour le développement, on le retourne pour faciliter les tests
+    res.json({
+      message: 'Un nouveau mot de passe temporaire a été généré et envoyé',
+      // En production, commenter la ligne suivante :
+      ...(process.env.NODE_ENV === 'development' && { temporaryPassword: motDePasseTemporaire })
+    });
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation du mot de passe:', error);
+    res.status(500).json({ message: 'Erreur lors de la réinitialisation du mot de passe' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -364,5 +424,6 @@ module.exports = {
   resetPassword,
   changePassword,
   getCurrentUser,
-  setDeviceToken
+  setDeviceToken,
+  forgotPassword
 };

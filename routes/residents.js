@@ -24,6 +24,9 @@ router.get('/:id', residentsController.getResident);
 // PUT /residents/:id - Mettre à jour un résident
 router.put('/:id', residentsController.updateResident);
 
+// POST /residents/:id/reset-password - Réinitialiser le mot de passe d'un résident
+router.post('/:id/reset-password', residentsController.resetResidentPassword);
+
 // DELETE /residents/:id - Supprimer un résident
 router.delete('/:id', residentsController.deleteResident);
 

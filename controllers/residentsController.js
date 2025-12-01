@@ -289,11 +289,53 @@ const updateResident = async (req, res) => {
   }
 };
 
+// Réinitialiser le mot de passe d'un résident (pour le gérant)
+const resetResidentPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que le résident appartient bien au propriétaire
+    const resident = await User.findOne({
+      _id: id,
+      idProprietaire: req.user._id,
+      role: 'resident'
+    });
+
+    if (!resident) {
+      return res.status(404).json({ message: "Résident non trouvé" });
+    }
+
+    // Générer un nouveau mot de passe temporaire
+    const motDePasseTemporaire = generateTemporaryPassword();
+
+    // Mettre à jour le mot de passe et réinitialiser firstLogin
+    resident.motDePasse = motDePasseTemporaire;
+    resident.firstLogin = true;
+    await resident.save();
+
+    // Envoyer les identifiants via WhatsApp (simulation)
+    await sendWhatsAppCredentials(
+      resident.telephone,
+      resident.email,
+      motDePasseTemporaire
+    );
+
+    res.json({
+      message: "Mot de passe réinitialisé avec succès",
+      temporaryPassword: motDePasseTemporaire
+    });
+  } catch (error) {
+    console.error("Erreur lors de la réinitialisation du mot de passe:", error);
+    res.status(500).json({ message: "Erreur lors de la réinitialisation du mot de passe" });
+  }
+};
+
 module.exports = {
   addResident,
   getResidents,
   getResident,
   deleteResident,
   updateResident,
-  getMyHouseResidents
+  getMyHouseResidents,
+  resetResidentPassword
 };

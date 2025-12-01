@@ -26,6 +26,9 @@ router.post('/reset-password', authenticateToken, requirePasswordChange, authCon
 // POST /auth/change-password - Changement de mot de passe normal
 router.post('/change-password', authenticateToken, authController.changePassword);
 
+// POST /auth/forgot-password - Mot de passe oublié (sans authentification)
+router.post('/forgot-password', authController.forgotPassword);
+
 // GET /auth/me - Récupérer les informations de l'utilisateur connecté
 router.get('/me', authenticateToken, authController.getCurrentUser);
 
