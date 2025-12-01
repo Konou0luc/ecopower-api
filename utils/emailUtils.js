@@ -2,6 +2,26 @@
 // Utilise nodemailer pour l'envoi d'emails réels
 
 const nodemailer = require('nodemailer');
+const path = require('path');
+const fs = require('fs');
+
+// Obtenir l'URL ou le chemin du logo
+const getLogoUrl = () => {
+  // Option 1: URL publique du logo (recommandé pour la production)
+  if (process.env.EMAIL_LOGO_URL) {
+    return process.env.EMAIL_LOGO_URL;
+  }
+  
+  // Option 2: Chemin local du logo (pour développement ou si hébergé)
+  const logoPath = path.join(__dirname, '../image/app/logo.png');
+  if (fs.existsSync(logoPath)) {
+    // Si le logo existe localement, on peut l'utiliser comme CID (Content-ID) pour l'inclure inline
+    return logoPath;
+  }
+  
+  // Option 3: URL par défaut (si vous hébergez le logo sur un CDN ou votre site)
+  return null; // Retourner null si pas de logo configuré
+};
 
 // Créer un transporteur email (peut être configuré avec Gmail, SMTP, etc.)
 const createTransporter = () => {
@@ -55,10 +75,26 @@ const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => 
       };
     }
 
+    const logoUrl = getLogoUrl();
+    const logoHtml = logoUrl 
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px;" />`
+      : '';
+    
+    const attachments = [];
+    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      attachments.push({
+        filename: 'logo.png',
+        path: logoUrl,
+        cid: 'logo' // Content-ID pour référence dans le HTML
+      });
+    }
+
     const mailOptions = {
       from: `"Ecopower" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Réinitialisation de votre mot de passe Ecopower',
+      attachments: attachments.length > 0 ? attachments : undefined,
       html: `
         <!DOCTYPE html>
         <html>
@@ -78,7 +114,8 @@ const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => 
         <body>
           <div class="container">
             <div class="header">
-              <h1>🔐 Réinitialisation de mot de passe</h1>
+              ${logoHtml}
+              <h1 style="margin-top: ${logoHtml ? '10px' : '0'}; margin-bottom: 0;">Réinitialisation de mot de passe</h1>
             </div>
             <div class="content">
               <p>Bonjour ${fullName || 'Utilisateur'},</p>
@@ -183,10 +220,26 @@ const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
       };
     }
 
+    const logoUrl = getLogoUrl();
+    const logoHtml = logoUrl 
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px;" />`
+      : '';
+    
+    const attachments = [];
+    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      attachments.push({
+        filename: 'logo.png',
+        path: logoUrl,
+        cid: 'logo' // Content-ID pour référence dans le HTML
+      });
+    }
+
     const mailOptions = {
       from: `"Ecopower" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Bienvenue sur Ecopower - Vos identifiants de connexion',
+      attachments: attachments.length > 0 ? attachments : undefined,
       html: `
         <!DOCTYPE html>
         <html>
@@ -206,7 +259,8 @@ const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1>👋 Bienvenue sur Ecopower</h1>
+              ${logoHtml}
+              <h1 style="margin-top: ${logoHtml ? '10px' : '0'}; margin-bottom: 0;">Bienvenue sur Ecopower</h1>
             </div>
             <div class="content">
               <p>Bonjour ${fullName || 'Utilisateur'},</p>
