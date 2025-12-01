@@ -104,12 +104,37 @@ const addResident = async (req, res) => {
     // Ajouter le résident dans la maison
     await maison.ajouterResident(resident._id);
 
-    // Envoyer les identifiants via WhatsApp (simulation)
-    const credentialsSent = await sendWhatsAppCredentials(
-      telephone,
-      email,
-      motDePasseTemporaire
-    );
+    // Envoyer les identifiants par email (priorité) et WhatsApp (fallback)
+    let credentialsSent = { success: false };
+    try {
+      const { sendCredentialsEmail } = require('../utils/emailUtils');
+      credentialsSent = await sendCredentialsEmail(
+        email,
+        motDePasseTemporaire,
+        `${prenom} ${nom}`
+      );
+      
+      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+      if (!credentialsSent.success || credentialsSent.mode === 'simulation') {
+        credentialsSent = await sendWhatsAppCredentials(
+          telephone,
+          email,
+          motDePasseTemporaire
+        );
+      }
+    } catch (e) {
+      console.error('Erreur lors de l\'envoi des identifiants:', e);
+      // En cas d'erreur, essayer WhatsApp en fallback
+      try {
+        credentialsSent = await sendWhatsAppCredentials(
+          telephone,
+          email,
+          motDePasseTemporaire
+        );
+      } catch (e2) {
+        console.error('Erreur lors de l\'envoi WhatsApp fallback:', e2);
+      }
+    }
 
     // Notifier le propriétaire qu'un résident a été ajouté
     try {
@@ -313,12 +338,36 @@ const resetResidentPassword = async (req, res) => {
     resident.firstLogin = true;
     await resident.save();
 
-    // Envoyer les identifiants via WhatsApp (simulation)
-    await sendWhatsAppCredentials(
-      resident.telephone,
-      resident.email,
-      motDePasseTemporaire
-    );
+    // Envoyer le nouveau mot de passe par email
+    try {
+      const { sendPasswordResetEmail } = require('../utils/emailUtils');
+      const emailResult = await sendPasswordResetEmail(
+        resident.email,
+        motDePasseTemporaire,
+        `${resident.prenom} ${resident.nom}`
+      );
+      
+      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+      if (!emailResult.success || emailResult.mode === 'simulation') {
+        await sendWhatsAppCredentials(
+          resident.telephone,
+          resident.email,
+          motDePasseTemporaire
+        );
+      }
+    } catch (e) {
+      console.error('Erreur lors de l\'envoi du mot de passe:', e);
+      // En cas d'erreur, essayer WhatsApp en fallback
+      try {
+        await sendWhatsAppCredentials(
+          resident.telephone,
+          resident.email,
+          motDePasseTemporaire
+        );
+      } catch (e2) {
+        console.error('Erreur lors de l\'envoi WhatsApp fallback:', e2);
+      }
+    }
 
     res.json({
       message: "Mot de passe réinitialisé avec succès",

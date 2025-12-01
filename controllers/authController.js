@@ -390,17 +390,37 @@ const forgotPassword = async (req, res) => {
     user.firstLogin = true;
     await user.save();
 
-    // Envoyer le nouveau mot de passe via WhatsApp (simulation)
-    // En production, vous pourriez envoyer un email ou un SMS
+    // Envoyer le nouveau mot de passe par email
     try {
-      const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
-      await sendWhatsAppCredentials(
-        user.telephone,
+      const { sendPasswordResetEmail } = require('../utils/emailUtils');
+      const emailResult = await sendPasswordResetEmail(
         user.email,
-        motDePasseTemporaire
+        motDePasseTemporaire,
+        `${user.prenom} ${user.nom}`
       );
+      
+      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+      if (!emailResult.success || emailResult.mode === 'simulation') {
+        const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
+        await sendWhatsAppCredentials(
+          user.telephone,
+          user.email,
+          motDePasseTemporaire
+        );
+      }
     } catch (e) {
-      console.error('Erreur lors de l\'envoi WhatsApp:', e);
+      console.error('Erreur lors de l\'envoi du mot de passe:', e);
+      // En cas d'erreur, essayer WhatsApp en fallback
+      try {
+        const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
+        await sendWhatsAppCredentials(
+          user.telephone,
+          user.email,
+          motDePasseTemporaire
+        );
+      } catch (e2) {
+        console.error('Erreur lors de l\'envoi WhatsApp fallback:', e2);
+      }
     }
 
     // En production, ne pas retourner le mot de passe dans la réponse

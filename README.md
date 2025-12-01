@@ -151,6 +151,17 @@ JWT_REFRESH_SECRET=votre_refresh_secret_tres_securise_ici
 JWT_EXPIRES_IN=24h
 JWT_REFRESH_EXPIRES_IN=7d
 
+# Configuration Email (SMTP)
+# Pour activer l'envoi d'emails réels, configurez ces variables :
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=votre_email@gmail.com
+SMTP_PASSWORD=votre_mot_de_passe_application
+
+# Note: Pour Gmail, vous devez utiliser un "Mot de passe d'application" 
+# généré depuis votre compte Google (pas votre mot de passe principal)
+
 # Configuration WhatsApp (pour plus tard)
 WHATSAPP_API_KEY=votre_whatsapp_api_key
 WHATSAPP_PHONE_NUMBER=votre_numero_whatsapp
