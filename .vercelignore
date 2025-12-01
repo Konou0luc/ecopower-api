@@ -5,7 +5,8 @@ node_modules
 *.log
 .DS_Store
 temp_doc/
-image/
+image/app/*.png
+!image/app/logo.png
 uploads/
 fix-subscription.js
 test-*.js

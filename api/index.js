@@ -162,6 +162,29 @@ app.use('/maisons', require('../routes/maisons'));
 app.use('/messages', require('../routes/messages'));
 app.use('/admin', require('../routes/admin'));
 
+// Route pour servir le logo (pour les emails)
+const path = require('path');
+const fs = require('fs');
+app.get('/logo.png', (req, res) => {
+  try {
+    const logoPath = path.join(__dirname, '../image/app/logo.png');
+    
+    // Vérifier si le fichier existe
+    if (!fs.existsSync(logoPath)) {
+      return res.status(404).json({ message: 'Logo non trouvé' });
+    }
+    
+    // Lire le fichier et le servir
+    const logoBuffer = fs.readFileSync(logoPath);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache 1 an
+    res.send(logoBuffer);
+  } catch (error) {
+    console.error('❌ [LOGO] Erreur lors de la lecture du logo:', error);
+    res.status(500).json({ message: 'Erreur lors de la lecture du logo' });
+  }
+});
+
 // Exposer config pour le frontend
 app.get('/config', (req, res) => {
   res.json({ freeMode: process.env.FREE_MODE === 'true' });

@@ -12,15 +12,26 @@ const getLogoUrl = () => {
     return process.env.EMAIL_LOGO_URL;
   }
   
-  // Option 2: Chemin local du logo (pour développement ou si hébergé)
+  // Option 2: URL automatique basée sur l'API (pour Vercel)
+  // Si on est sur Vercel, utiliser l'URL de l'API
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/logo.png`;
+  }
+  
+  // Option 3: URL de l'API si configurée
+  if (process.env.API_URL) {
+    return `${process.env.API_URL}/logo.png`;
+  }
+  
+  // Option 4: Chemin local du logo (pour développement local)
   const logoPath = path.join(__dirname, '../image/app/logo.png');
   if (fs.existsSync(logoPath)) {
     // Si le logo existe localement, on peut l'utiliser comme CID (Content-ID) pour l'inclure inline
     return logoPath;
   }
   
-  // Option 3: URL par défaut (si vous hébergez le logo sur un CDN ou votre site)
-  return null; // Retourner null si pas de logo configuré
+  // Option 5: Pas de logo configuré
+  return null;
 };
 
 // Créer un transporteur email (peut être configuré avec Gmail, SMTP, etc.)
