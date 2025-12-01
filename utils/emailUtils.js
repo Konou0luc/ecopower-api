@@ -88,7 +88,7 @@ const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => 
 
     const logoUrl = getLogoUrl();
     const logoHtml = logoUrl 
-      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px;" />`
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" width="120" height="auto" />`
       : '';
     
     const attachments = [];
@@ -233,7 +233,7 @@ const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
 
     const logoUrl = getLogoUrl();
     const logoHtml = logoUrl 
-      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px;" />`
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" width="120" height="auto" />`
       : '';
     
     const attachments = [];
