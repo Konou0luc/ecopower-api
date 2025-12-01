@@ -103,12 +103,10 @@ app.use((req, res, next) => {
 // Connexion MongoDB lazy (se connecte seulement quand nécessaire)
 // Sur Vercel, la connexion est réutilisée entre les invocations
 const mongoose = require('mongoose');
-let isConnected = false;
 
 const connectDB = async () => {
   // Vérifier si déjà connecté
   if (mongoose.connection.readyState === 1) {
-    isConnected = true;
     return;
   }
   
@@ -129,11 +127,9 @@ const connectDB = async () => {
     await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 5000, // Timeout plus court pour Vercel
     });
-    isConnected = true;
     console.log('✅ [VERCEL] MongoDB connecté');
   } catch (error) {
     console.error('❌ [VERCEL] Erreur connexion MongoDB:', error);
-    isConnected = false;
     throw error;
   }
 };
@@ -195,7 +191,7 @@ app.get('/', (req, res) => {
 });
 
 // Gestion des erreurs
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('❌ [VERCEL] Erreur:', err.stack);
   res.status(500).json({ message: 'Erreur interne du serveur' });
 });
