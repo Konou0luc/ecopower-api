@@ -67,11 +67,11 @@ const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => 
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #FFA800 0%, #E69500 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .credentials { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
-            .password { font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 2px; text-align: center; padding: 10px; background: #f0f0f0; border-radius: 5px; }
-            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; }
+            .credentials { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FFA800; }
+            .password { font-size: 24px; font-weight: bold; color: #FFA800; letter-spacing: 2px; text-align: center; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+            .warning { background: #FFF8E1; border-left: 4px solid #FFD700; padding: 15px; margin: 20px 0; border-radius: 5px; }
             .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
           </style>
         </head>
@@ -195,11 +195,11 @@ const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #FFA800 0%, #E69500 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .credentials { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
-            .password { font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 2px; text-align: center; padding: 10px; background: #f0f0f0; border-radius: 5px; }
-            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; }
+            .credentials { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FFA800; }
+            .password { font-size: 24px; font-weight: bold; color: #FFA800; letter-spacing: 2px; text-align: center; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+            .warning { background: #FFF8E1; border-left: 4px solid #FFD700; padding: 15px; margin: 20px 0; border-radius: 5px; }
             .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
           </style>
         </head>
