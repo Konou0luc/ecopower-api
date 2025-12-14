@@ -18,25 +18,75 @@ const envoyer = async (residentId, message) => {
       return { success: false, error: 'DEVICE_TOKEN_MISSING' };
     }
 
-    const payload = {
+    // Vérifier la configuration Firebase
+    const app = admin.app();
+    const projectId = app.options.projectId || app.options.credential?.projectId;
+    console.log(`🔧 Firebase Project ID: ${projectId}`);
+
+    // Utiliser la nouvelle API Firebase Admin SDK (v1)
+    const messagePayload = {
       notification: {
         title: 'Ecopower',
         body: message
       },
       data: {
-        userId: resident._id.toString()
+        userId: resident._id.toString(),
+        type: 'notification'
+      },
+      token: deviceToken,
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'ecopower_default'
+        }
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10'
+        },
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1
+          }
+        }
       }
     };
 
-    const options = { priority: 'high' };
-
-    console.log(`🔔 Envoi FCM à ${resident.nomComplet} (${resident._id})`);
-    const response = await admin.messaging().sendToDevice(deviceToken, payload, options);
-    console.log('✅ FCM envoyé:', JSON.stringify(response));
-    return { success: true, response };
+    const nomComplet = resident.nomComplet || `${resident.prenom} ${resident.nom}`;
+    console.log(`🔔 Envoi FCM à ${nomComplet} (${resident._id})`);
+    console.log(`📱 Device Token (preview): ${deviceToken.substring(0, 20)}...`);
+    
+    const response = await admin.messaging().send(messagePayload);
+    console.log('✅ FCM envoyé avec succès. Message ID:', response);
+    return { success: true, response: { messageId: response } };
   } catch (error) {
     console.error('❌ Erreur lors de l\'envoi FCM:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Détails de l\'erreur:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // Gestion spécifique des erreurs Firebase
+    let errorMessage = error.message;
+    if (error.code === 'messaging/invalid-registration-token' || 
+        error.code === 'messaging/registration-token-not-registered') {
+      errorMessage = 'Le deviceToken est invalide ou expiré. L\'utilisateur doit se reconnecter.';
+    } else if (error.code === 'messaging/sender-id-mismatch') {
+      errorMessage = 'Le deviceToken a été généré avec un projet Firebase différent. Vérifiez la configuration Firebase.';
+    }
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      errorCode: error.code,
+      details: {
+        code: error.code,
+        message: error.message
+      }
+    };
   }
 };
 

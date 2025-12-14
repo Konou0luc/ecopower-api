@@ -45,4 +45,7 @@ router.get('/logs', adminController.getLogs);
 router.get('/system/status', systemController.getSystemStatus);
 router.get('/system/info', systemController.getSystemInfo);
 
+// Test des notifications FCM
+router.post('/test/notification', adminController.testNotification);
+
 module.exports = router;

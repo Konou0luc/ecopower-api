@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Maison = require('../models/Maison');
+const Consommation = require('../models/Consommation');
+const Facture = require('../models/Facture');
+const Message = require('../models/Message');
+const Notification = require('../models/Notification');
+const Log = require('../models/Log');
 const { generateTemporaryPassword } = require('../utils/passwordUtils');
 const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
 const notifications = require('../utils/notifications');
@@ -254,9 +259,31 @@ const deleteResident = async (req, res) => {
       );
     }
 
+    // Supprimer toutes les données associées au résident
+    // Supprimer les consommations du résident
+    await Consommation.deleteMany({ residentId: resident._id });
+
+    // Supprimer les factures du résident
+    await Facture.deleteMany({ residentId: resident._id });
+
+    // Supprimer les messages (expéditeur ou destinataire)
+    await Message.deleteMany({
+      $or: [
+        { expediteur: resident._id },
+        { destinataire: resident._id }
+      ]
+    });
+
+    // Supprimer les notifications (destinataire)
+    await Notification.deleteMany({ destinataire: resident._id });
+
+    // Supprimer les logs liés au résident
+    await Log.deleteMany({ user: resident._id });
+
+    // Supprimer le résident
     await User.findByIdAndDelete(resident._id);
 
-    res.json({ message: "Résident supprimé avec succès" });
+    res.json({ message: "Résident et toutes ses données associées supprimés avec succès" });
   } catch (error) {
     console.error("Erreur lors de la suppression du résident:", error);
     res.status(500).json({ message: "Erreur lors de la suppression du résident" });

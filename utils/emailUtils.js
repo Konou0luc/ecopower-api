@@ -350,9 +350,181 @@ Pour vous connecter :
   }
 };
 
+// Envoyer un email de contact depuis le formulaire du site web
+const sendContactEmail = async (contactData) => {
+  try {
+    const { name, email, phone, subject, message } = contactData;
+    const transporter = createTransporter();
+    
+    if (!transporter) {
+      // Mode développement : afficher dans la console
+      console.log('📧 [EMAIL SIMULÉ] Email de contact:');
+      console.log(`   Nom: ${name}`);
+      console.log(`   Email: ${email}`);
+      console.log(`   Téléphone: ${phone}`);
+      console.log(`   Sujet: ${subject}`);
+      console.log(`   Message: ${message}`);
+      console.log('   ⚠️ Pour activer l\'envoi réel, configurez SMTP_USER et SMTP_PASSWORD dans .env');
+      
+      return {
+        success: true,
+        messageId: `email_sim_${Date.now()}`,
+        sentAt: new Date(),
+        to: process.env.CONTACT_EMAIL || process.env.SMTP_USER,
+        mode: 'simulation'
+      };
+    }
+
+    const logoUrl = getLogoUrl();
+    const logoHtml = logoUrl 
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" width="120" height="auto" />`
+      : '';
+    
+    const attachments = [];
+    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      attachments.push({
+        filename: 'logo.png',
+        path: logoUrl,
+        cid: 'logo' // Content-ID pour référence dans le HTML
+      });
+    }
+
+    // Traduire le sujet
+    const subjectLabels = {
+      'demande-info': 'Demande d\'information',
+      'devis': 'Demande de devis',
+      'support': 'Support technique',
+      'partenariat': 'Partenariat',
+      'autre': 'Autre'
+    };
+    const subjectLabel = subjectLabels[subject] || subject;
+
+    const recipientEmail = process.env.CONTACT_EMAIL || process.env.SMTP_USER;
+
+    const mailOptions = {
+      from: `"Ecopower Contact" <${process.env.SMTP_USER}>`,
+      to: recipientEmail,
+      replyTo: email, // Permettre de répondre directement à l'expéditeur
+      subject: `[Contact Ecopower] ${subjectLabel} - ${name}`,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #FFA800 0%, #E69500 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .info-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FFA800; }
+            .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .info-row:last-child { border-bottom: none; }
+            .info-label { font-weight: bold; color: #666; display: inline-block; width: 120px; }
+            .message-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              ${logoHtml}
+              <h1 style="margin-top: ${logoHtml ? '10px' : '0'}; margin-bottom: 0;">Nouveau message de contact</h1>
+            </div>
+            <div class="content">
+              <p>Vous avez reçu un nouveau message depuis le formulaire de contact du site Ecopower.</p>
+              
+              <div class="info-box">
+                <div class="info-row">
+                  <span class="info-label">📧 Email :</span>
+                  <span>${email}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">👤 Nom :</span>
+                  <span>${name}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">📱 Téléphone :</span>
+                  <span>${phone}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">📋 Sujet :</span>
+                  <span>${subjectLabel}</span>
+                </div>
+              </div>
+
+              <div class="message-box">
+                <h3 style="margin-top: 0; color: #4CAF50;">💬 Message :</h3>
+                <p style="white-space: pre-wrap; margin: 0;">${message}</p>
+              </div>
+
+              <p style="margin-top: 30px;">
+                <strong>💡 Pour répondre :</strong> Répondez directement à cet email. L'adresse de réponse est configurée pour ${email}.
+              </p>
+
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Ecopower - Gestion de consommation électrique</p>
+                <p>Cet email a été envoyé automatiquement depuis le formulaire de contact du site web.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+Nouveau message de contact - Ecopower
+
+Vous avez reçu un nouveau message depuis le formulaire de contact du site Ecopower.
+
+📧 Email : ${email}
+👤 Nom : ${name}
+📱 Téléphone : ${phone}
+📋 Sujet : ${subjectLabel}
+
+💬 Message :
+${message}
+
+---
+Pour répondre, répondez directement à cet email.
+© ${new Date().getFullYear()} Ecopower
+      `.trim(),
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log('✅ [EMAIL] Email de contact envoyé avec succès:', info.messageId);
+    
+    return {
+      success: true,
+      messageId: info.messageId,
+      sentAt: new Date(),
+      to: recipientEmail,
+      mode: 'production'
+    };
+  } catch (error) {
+    console.error('❌ [EMAIL] Erreur lors de l\'envoi de l\'email de contact:', error);
+    
+    // En cas d'erreur, afficher dans la console pour le développement
+    console.log('📧 [EMAIL FALLBACK] Message de contact pour développement:');
+    console.log(`   Nom: ${contactData.name}`);
+    console.log(`   Email: ${contactData.email}`);
+    console.log(`   Téléphone: ${contactData.phone}`);
+    console.log(`   Sujet: ${contactData.subject}`);
+    console.log(`   Message: ${contactData.message}`);
+    
+    return {
+      success: false,
+      error: error.message,
+      mode: 'error_fallback'
+    };
+  }
+};
+
 module.exports = {
   sendPasswordResetEmail,
-  sendCredentialsEmail
+  sendCredentialsEmail,
+  sendContactEmail
 };
 
 

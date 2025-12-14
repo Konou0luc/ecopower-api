@@ -388,12 +388,105 @@ const deleteUser = async (req, res) => {
       }
     }
 
+    // Suppression en cascade de toutes les données liées à l'utilisateur
+
+    // 1. Si l'utilisateur est un propriétaire, gérer ses maisons et abonnements
+    if (user.role === 'proprietaire') {
+      // Récupérer toutes les maisons du propriétaire
+      const maisons = await Maison.find({ proprietaireId: id });
+      
+      // Pour chaque maison, supprimer toutes les données associées
+      for (const maison of maisons) {
+        // Supprimer les consommations liées aux résidents de cette maison
+        const residentsIds = maison.listeResidents || [];
+        await Consommation.deleteMany({ 
+          $or: [
+            { maisonId: maison._id },
+            { residentId: { $in: residentsIds } }
+          ]
+        });
+
+        // Supprimer les factures liées aux résidents de cette maison
+        await Facture.deleteMany({ 
+          $or: [
+            { maisonId: maison._id },
+            { residentId: { $in: residentsIds } }
+          ]
+        });
+
+        // Supprimer les résidents de cette maison
+        await User.deleteMany({ _id: { $in: residentsIds } });
+
+        // Supprimer la maison
+        await Maison.findByIdAndDelete(maison._id);
+      }
+
+      // Supprimer les abonnements du propriétaire
+      await Abonnement.deleteMany({ proprietaireId: id });
+    }
+
+    // 2. Si l'utilisateur est un résident
+    if (user.role === 'resident') {
+      // Retirer le résident de la liste des résidents dans les maisons
+      await Maison.updateMany(
+        { listeResidents: id },
+        { $pull: { listeResidents: id } }
+      );
+
+      // Supprimer les consommations du résident
+      await Consommation.deleteMany({ residentId: id });
+
+      // Supprimer les factures du résident
+      await Facture.deleteMany({ residentId: id });
+    }
+
+    // 3. Supprimer les résidents qui ont cet utilisateur comme propriétaire
+    // (si l'utilisateur supprimé était un propriétaire mais pas géré ci-dessus)
+    if (user.role === 'proprietaire') {
+      const residents = await User.find({ idProprietaire: id, role: 'resident' });
+      for (const resident of residents) {
+        // Retirer de la liste des résidents dans les maisons
+        if (resident.maisonId) {
+          await Maison.updateOne(
+            { _id: resident.maisonId },
+            { $pull: { listeResidents: resident._id } }
+          );
+        }
+        // Supprimer les consommations et factures du résident
+        await Consommation.deleteMany({ residentId: resident._id });
+        await Facture.deleteMany({ residentId: resident._id });
+        // Supprimer le résident
+        await User.findByIdAndDelete(resident._id);
+      }
+    }
+
+    // 4. Supprimer les messages (expéditeur ou destinataire)
+    await Message.deleteMany({
+      $or: [
+        { expediteur: id },
+        { destinataire: id }
+      ]
+    });
+
+    // 5. Supprimer les notifications (destinataire)
+    await Notification.deleteMany({ destinataire: id });
+
+    // 6. Supprimer les logs liés à l'utilisateur
+    await Log.deleteMany({ user: id });
+
+    // 7. Mettre à jour les références idProprietaire dans les autres utilisateurs
+    await User.updateMany(
+      { idProprietaire: id },
+      { $set: { idProprietaire: null } }
+    );
+
+    // 8. Finalement, supprimer l'utilisateur lui-même
     await User.findByIdAndDelete(id);
 
-    res.json({ message: 'Utilisateur supprimé avec succès' });
+    res.json({ message: 'Utilisateur et toutes ses données associées supprimés avec succès' });
   } catch (error) {
     console.error('Erreur lors de la suppression de l\'utilisateur:', error);
-    res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
+    res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur', error: error.message });
   }
 };
 
@@ -501,13 +594,46 @@ const getResidents = async (req, res) => {
 const deleteResident = async (req, res) => {
   try {
     const { id } = req.params;
-    const resident = await User.findByIdAndDelete(id);
-
+    
+    // Vérifier que le résident existe
+    const resident = await User.findById(id);
     if (!resident) {
       return res.status(404).json({ message: 'Résident non trouvé' });
     }
 
-    res.json({ message: 'Résident supprimé avec succès' });
+    // Retirer le résident de la maison associée
+    if (resident.maisonId) {
+      await Maison.updateOne(
+        { _id: resident.maisonId },
+        { $pull: { listeResidents: resident._id } }
+      );
+    }
+
+    // Supprimer toutes les données associées au résident
+    // Supprimer les consommations du résident
+    await Consommation.deleteMany({ residentId: resident._id });
+
+    // Supprimer les factures du résident
+    await Facture.deleteMany({ residentId: resident._id });
+
+    // Supprimer les messages (expéditeur ou destinataire)
+    await Message.deleteMany({
+      $or: [
+        { expediteur: resident._id },
+        { destinataire: resident._id }
+      ]
+    });
+
+    // Supprimer les notifications (destinataire)
+    await Notification.deleteMany({ destinataire: resident._id });
+
+    // Supprimer les logs liés au résident
+    await Log.deleteMany({ user: resident._id });
+
+    // Supprimer le résident
+    await User.findByIdAndDelete(resident._id);
+
+    res.json({ message: 'Résident et toutes ses données associées supprimés avec succès' });
   } catch (error) {
     console.error('Erreur lors de la suppression du résident:', error);
     res.status(500).json({ message: 'Erreur lors de la suppression du résident' });
@@ -641,6 +767,74 @@ const getLogs = async (req, res) => {
   }
 };
 
+// Tester l'envoi d'une notification FCM à un utilisateur
+const testNotification = async (req, res) => {
+  try {
+    const { userId, message } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId requis' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    if (!user.deviceToken) {
+      return res.status(400).json({ 
+        message: 'L\'utilisateur n\'a pas de deviceToken enregistré',
+        user: {
+          id: user._id,
+          nom: user.nom,
+          prenom: user.prenom,
+          email: user.email,
+          role: user.role
+        }
+      });
+    }
+
+    const notifications = require('../utils/notifications');
+    const testMessage = message || `Notification de test - ${new Date().toLocaleString('fr-FR')}`;
+    
+    const result = await notifications.envoyer(userId, testMessage);
+
+    if (result.success) {
+      res.json({
+        message: 'Notification envoyée avec succès',
+        user: {
+          id: user._id,
+          nom: user.nom,
+          prenom: user.prenom,
+          email: user.email,
+          role: user.role,
+          deviceToken: user.deviceToken.substring(0, 20) + '...' // Masquer le token complet
+        },
+        notification: {
+          message: testMessage,
+          sentAt: new Date(),
+          response: result.response
+        }
+      });
+    } else {
+      res.status(500).json({
+        message: 'Erreur lors de l\'envoi de la notification',
+        error: result.error,
+        user: {
+          id: user._id,
+          nom: user.nom,
+          prenom: user.prenom,
+          email: user.email,
+          role: user.role
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Erreur lors du test de notification:', error);
+    res.status(500).json({ message: 'Erreur lors du test de notification', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllUsers,
@@ -654,5 +848,6 @@ module.exports = {
   deleteResident,
   getMessages,
   getNotifications,
-  getLogs
+  getLogs,
+  testNotification
 };

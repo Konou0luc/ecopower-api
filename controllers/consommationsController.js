@@ -93,6 +93,19 @@ const addConsommation = async (req, res) => {
 
     await consommation.save();
 
+    // Envoyer une notification FCM au résident pour l'informer du nouveau relevé
+    try {
+      const moisNoms = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ];
+      const nomMois = moisNoms[mois - 1];
+      const messageReleve = `Nouveau relevé enregistré pour ${nomMois} ${annee}: ${consommation.kwh} kWh (${consommation.montant.toFixed(2)} FCFA)`;
+      await notifications.envoyer(residentId, messageReleve);
+    } catch (e) {
+      console.error('FCM relevé erreur:', e?.message || e);
+    }
+
     // Vérifier consommation excessive par rapport aux 3 dernières
     const troisDernieres = await Consommation.find({
       residentId,

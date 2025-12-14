@@ -157,6 +157,7 @@ app.use('/abonnements', require('../routes/abonnements'));
 app.use('/maisons', require('../routes/maisons'));
 app.use('/messages', require('../routes/messages'));
 app.use('/admin', require('../routes/admin'));
+app.use('/contact', require('../routes/contact'));
 
 // Route pour servir le logo (pour les emails)
 const path = require('path');
