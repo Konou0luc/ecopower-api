@@ -6,8 +6,7 @@ const Facture = require('../models/Facture');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const Log = require('../models/Log');
-const { generateTemporaryPassword } = require('../utils/passwordUtils');
-const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
+const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
 const notifications = require('../utils/notifications');
 
 // Obtenir les résidents de la maison de l'utilisateur connecté
@@ -88,20 +87,18 @@ const addResident = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Générer un mot de passe temporaire
-    const motDePasseTemporaire = generateTemporaryPassword();
-
-    // Créer le résident et stocker maisonId
+    // Créer le résident sans mot de passe (authentification Google uniquement)
     const resident = new User({
       nom,
       prenom,
       email,
       telephone,
-      motDePasse: motDePasseTemporaire,
+      motDePasse: null, // Pas de mot de passe, authentification Google uniquement
+      authMethod: 'google', // Les résidents utilisent Google Sign-In
       role: 'resident',
       idProprietaire: req.user._id,
       maisonId: maisonId,
-      firstLogin: true
+      firstLogin: false // Plus besoin de firstLogin avec Google Sign-In
     });
 
     await resident.save();
@@ -109,32 +106,36 @@ const addResident = async (req, res) => {
     // Ajouter le résident dans la maison
     await maison.ajouterResident(resident._id);
 
-    // Envoyer les identifiants par email (priorité) et WhatsApp (fallback)
-    let credentialsSent = { success: false };
+    // Envoyer l'invitation Google Sign-In par email (priorité) et WhatsApp (fallback)
+    let invitationSent = { success: false };
     try {
-      const { sendCredentialsEmail } = require('../utils/emailUtils');
-      credentialsSent = await sendCredentialsEmail(
+      const { sendGoogleInvitationEmail } = require('../utils/emailUtils');
+      invitationSent = await sendGoogleInvitationEmail(
         email,
-        motDePasseTemporaire,
-        `${prenom} ${nom}`
+        `${prenom} ${nom}`,
+        maison.nomMaison
       );
       
       // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
-      if (!credentialsSent.success || credentialsSent.mode === 'simulation') {
-        credentialsSent = await sendWhatsAppCredentials(
+      if (!invitationSent.success || invitationSent.mode === 'simulation') {
+        const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
+        invitationSent = await sendGoogleInvitationWhatsApp(
           telephone,
           email,
-          motDePasseTemporaire
+          `${prenom} ${nom}`,
+          maison.nomMaison
         );
       }
     } catch (e) {
-      console.error('Erreur lors de l\'envoi des identifiants:', e);
+      console.error('Erreur lors de l\'envoi de l\'invitation:', e);
       // En cas d'erreur, essayer WhatsApp en fallback
       try {
-        credentialsSent = await sendWhatsAppCredentials(
+        const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
+        invitationSent = await sendGoogleInvitationWhatsApp(
           telephone,
           email,
-          motDePasseTemporaire
+          `${prenom} ${nom}`,
+          maison.nomMaison
         );
       } catch (e2) {
         console.error('Erreur lors de l\'envoi WhatsApp fallback:', e2);
@@ -149,18 +150,17 @@ const addResident = async (req, res) => {
     }
 
     res.status(201).json({
-      message: 'Résident ajouté avec succès',
+      message: 'Résident ajouté avec succès. Invitation Google Sign-In envoyée.',
       resident: {
         _id: resident._id,
         nom: resident.nom,
         prenom: resident.prenom,
         email: resident.email,
         telephone: resident.telephone,
-        maisonId: resident.maisonId, // 🔥 inclure la maison dans la réponse
-        firstLogin: resident.firstLogin
+        maisonId: resident.maisonId,
+        authMethod: resident.authMethod
       },
-      credentialsSent,
-      temporaryPassword: motDePasseTemporaire // ⚠️ À retirer en production
+      invitationSent
     });
   } catch (error) {
     console.error("Erreur lors de l'ajout du résident:", error);

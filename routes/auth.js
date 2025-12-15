@@ -14,6 +14,9 @@ router.post('/login', (req, res, next) => {
   next();
 }, authController.login);
 
+// POST /auth/google - Authentification Google Sign-In
+router.post('/google', authController.googleAuth);
+
 // POST /auth/refresh - Rafraîchir le token
 router.post('/refresh', authController.refreshToken);
 

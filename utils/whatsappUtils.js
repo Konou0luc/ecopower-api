@@ -118,8 +118,35 @@ const sendSubscriptionExpiryNotification = async (telephone, joursRestants) => {
   }
 };
 
+// Envoyer une invitation Google Sign-In par WhatsApp
+const sendGoogleInvitationWhatsApp = async (telephone, email, fullName, maisonName) => {
+  try {
+    console.log(`📱 Invitation Google Sign-In WhatsApp simulée envoyée à ${telephone}:`);
+    console.log(`Email: ${email}`);
+    console.log(`Nom: ${fullName}`);
+    console.log(`Maison: ${maisonName || 'N/A'}`);
+    
+    // Simuler un délai d'envoi
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return {
+      success: true,
+      messageId: `google_invite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      sentAt: new Date(),
+      to: telephone
+    };
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'invitation WhatsApp:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   sendWhatsAppCredentials,
+  sendGoogleInvitationWhatsApp,
   sendFactureNotification,
   sendPaymentReminder,
   sendSubscriptionExpiryNotification

@@ -1,7 +1,11 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Abonnement = require('../models/Abonnement');
 const { generateTemporaryPassword } = require('../utils/passwordUtils');
+
+// Initialiser le client Google OAuth2
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Générer les tokens JWT
 const generateTokens = (userId) => {
@@ -111,6 +115,15 @@ const login = async (req, res) => {
     }
 
     console.log('✅ [LOGIN] Utilisateur trouvé:', user.email, 'Role:', user.role);
+
+    // Vérifier si l'utilisateur utilise Google Sign-In
+    if (user.authMethod === 'google' || !user.motDePasse) {
+      console.log('❌ [LOGIN] Cet utilisateur utilise Google Sign-In');
+      return res.status(400).json({ 
+        message: 'Cet compte utilise Google Sign-In. Veuillez vous connecter avec Google.',
+        useGoogleSignIn: true
+      });
+    }
 
     // Vérifier le mot de passe
     const isPasswordValid = await user.comparePassword(normalizedPassword);
@@ -436,9 +449,231 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+// Authentification Google Sign-In
+const googleAuth = async (req, res) => {
+  try {
+    const { idToken, telephone, nom, prenom } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: 'Token Google requis' });
+    }
+
+    console.log('🔐 [GOOGLE AUTH] Tentative d\'authentification Google');
+
+    // Vérifier le token Google
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      console.error('❌ [GOOGLE AUTH] Erreur de vérification du token:', error);
+      return res.status(401).json({ message: 'Token Google invalide' });
+    }
+
+    const payload = ticket.getPayload();
+    const googleId = payload.sub;
+    const email = payload.email?.toLowerCase().trim();
+    const googleName = payload.name || '';
+    const googleGivenName = payload.given_name || '';
+    const googleFamilyName = payload.family_name || '';
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email non disponible dans le compte Google' });
+    }
+
+    console.log('✅ [GOOGLE AUTH] Token vérifié pour:', email);
+
+    // Chercher l'utilisateur par googleId ou email
+    let user = await User.findOne({
+      $or: [
+        { googleId: googleId },
+        { email: email }
+      ]
+    });
+
+    // Si l'utilisateur existe
+    if (user) {
+      // Si l'utilisateur n'a pas encore de googleId, le lier
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authMethod = 'google';
+        // Si l'utilisateur avait un mot de passe, on peut le garder ou le supprimer
+        // Pour simplifier, on le garde mais il ne sera plus utilisé
+        await user.save();
+      }
+
+      // Vérifier que c'est bien le même compte Google
+      if (user.googleId !== googleId) {
+        return res.status(400).json({ 
+          message: 'Cet email est associé à un autre compte Google' 
+        });
+      }
+
+      // Générer les tokens
+      const { accessToken, refreshToken } = generateTokens(user._id);
+      user.refreshToken = refreshToken;
+      await user.save();
+
+      // Récupérer l'abonnement si c'est un propriétaire
+      let abonnement = null;
+      if (FREE_MODE) {
+        const now = new Date();
+        const future = new Date(now);
+        future.setFullYear(future.getFullYear() + 5);
+        abonnement = {
+          statut: 'actif',
+          isActive: true,
+          dateDebut: now,
+          dateFin: future,
+          nbResidentsMax: 9999,
+        };
+      } else if (user.role === 'proprietaire' && user.abonnementId) {
+        abonnement = await Abonnement.findById(user.abonnementId);
+        if (abonnement) {
+          abonnement.isActif();
+          await abonnement.save();
+        }
+      }
+
+      console.log('✅ [GOOGLE AUTH] Connexion réussie pour:', user.email, 'Role:', user.role);
+
+      return res.json({
+        message: 'Connexion réussie',
+        user,
+        accessToken,
+        refreshToken,
+        abonnement,
+        needsRegistration: false
+      });
+    }
+
+    // Si l'utilisateur n'existe pas - Nouvelle inscription
+    // Vérifier si c'est un résident (doit être créé par un propriétaire)
+    const existingResident = await User.findOne({ 
+      email: email, 
+      role: 'resident' 
+    });
+
+    if (existingResident) {
+      // Si c'est un résident existant, lier son compte Google et le connecter
+      if (!existingResident.googleId) {
+        existingResident.googleId = googleId;
+        existingResident.authMethod = 'google';
+        await existingResident.save();
+      }
+
+      // Vérifier que c'est bien le même compte Google
+      if (existingResident.googleId !== googleId) {
+        return res.status(400).json({ 
+          message: 'Cet email est associé à un autre compte Google' 
+        });
+      }
+
+      // Générer les tokens pour le résident
+      const { accessToken, refreshToken } = generateTokens(existingResident._id);
+      existingResident.refreshToken = refreshToken;
+      await existingResident.save();
+
+      console.log('✅ [GOOGLE AUTH] Connexion résident réussie pour:', existingResident.email);
+
+      return res.json({
+        message: 'Connexion réussie',
+        user: existingResident,
+        accessToken,
+        refreshToken,
+        abonnement: null,
+        needsRegistration: false
+      });
+    }
+
+    // Pour les nouveaux propriétaires, vérifier qu'on a les informations nécessaires
+    if (!telephone) {
+      // Utiliser les données Google si disponibles
+      const finalNom = nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
+      const finalPrenom = prenom || googleGivenName || googleName.split(' ').slice(0, -1).join(' ') || googleName || '';
+
+      return res.status(200).json({
+        message: 'Informations supplémentaires requises',
+        needsRegistration: true,
+        googleData: {
+          email: email,
+          nom: finalNom,
+          prenom: finalPrenom,
+          googleId: googleId
+        },
+        requiredFields: ['telephone']
+      });
+    }
+
+    // Créer le nouveau compte propriétaire
+    const finalNom = nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
+    const finalPrenom = prenom || googleGivenName || googleName.split(' ').slice(0, -1).join(' ') || googleName || '';
+
+    if (!finalNom || !finalPrenom) {
+      return res.status(400).json({ 
+        message: 'Nom et prénom requis',
+        needsRegistration: true,
+        googleData: {
+          email: email,
+          nom: finalNom,
+          prenom: finalPrenom,
+          googleId: googleId
+        },
+        requiredFields: ['nom', 'prenom', 'telephone']
+      });
+    }
+
+    // Vérifier si l'email existe déjà (double vérification)
+    const emailExists = await User.findOne({ email: email });
+    if (emailExists) {
+      return res.status(400).json({ message: 'Cet email est déjà utilisé' });
+    }
+
+    // Créer l'utilisateur
+    user = new User({
+      nom: finalNom,
+      prenom: finalPrenom,
+      email: email,
+      telephone: telephone.trim(),
+      googleId: googleId,
+      authMethod: 'google',
+      role: 'proprietaire',
+      // Pas de mot de passe pour les utilisateurs Google
+      motDePasse: null
+    });
+
+    await user.save();
+
+    // Générer les tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    console.log('✅ [GOOGLE AUTH] Nouveau compte créé pour:', user.email);
+
+    res.status(201).json({
+      message: 'Compte créé avec succès',
+      user,
+      accessToken,
+      refreshToken,
+      abonnement: null,
+      needsRegistration: false
+    });
+  } catch (error) {
+    console.error('💥 [GOOGLE AUTH] Erreur lors de l\'authentification Google:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de l\'authentification Google',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
+  googleAuth,
   refreshToken,
   logout,
   resetPassword,

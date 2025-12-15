@@ -28,7 +28,19 @@ const userSchema = new mongoose.Schema(
     },
     motDePasse: {
       type: String,
-      required: true,
+      required: false, // Rendre optionnel pour permettre Google Sign-In
+      default: null,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Permet plusieurs null
+      default: null,
+    },
+    authMethod: {
+      type: String,
+      enum: ['google', 'email'],
+      default: 'email',
     },
     role: {
       type: String,
@@ -68,8 +80,22 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Hash du mot de passe avant sauvegarde
+// Validation personnalisée : au moins googleId ou motDePasse doit être présent
+userSchema.pre("validate", function (next) {
+  if (!this.googleId && !this.motDePasse) {
+    const error = new Error('Au moins une méthode d\'authentification est requise (Google ou mot de passe)');
+    return next(error);
+  }
+  next();
+});
+
+// Hash du mot de passe avant sauvegarde (seulement si motDePasse est fourni)
 userSchema.pre("save", async function (next) {
+  // Si c'est une authentification Google, pas besoin de hasher le mot de passe
+  if (this.authMethod === 'google' || !this.motDePasse) {
+    return next();
+  }
+
   if (!this.isModified("motDePasse")) return next();
 
   try {
@@ -83,6 +109,10 @@ userSchema.pre("save", async function (next) {
 
 // Méthode pour comparer les mots de passe
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  // Si l'utilisateur utilise Google Sign-In, pas de comparaison de mot de passe
+  if (this.authMethod === 'google' || !this.motDePasse) {
+    return false;
+  }
   return bcrypt.compare(candidatePassword, this.motDePasse);
 };
 

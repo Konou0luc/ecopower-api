@@ -350,6 +350,153 @@ Pour vous connecter :
   }
 };
 
+// Envoyer une invitation Google Sign-In (pour nouveaux résidents)
+const sendGoogleInvitationEmail = async (email, fullName, maisonName) => {
+  try {
+    const transporter = createTransporter();
+    
+    if (!transporter) {
+      // Mode développement : afficher dans la console
+      console.log('📧 [EMAIL SIMULÉ] Invitation Google Sign-In:');
+      console.log(`   Destinataire: ${email}`);
+      console.log(`   Nom: ${fullName || 'Utilisateur'}`);
+      console.log(`   Maison: ${maisonName || 'N/A'}`);
+      console.log('   ⚠️ Pour activer l\'envoi réel, configurez SMTP_USER et SMTP_PASSWORD dans .env');
+      
+      return {
+        success: true,
+        messageId: `email_sim_${Date.now()}`,
+        sentAt: new Date(),
+        to: email,
+        mode: 'simulation'
+      };
+    }
+
+    const logoUrl = getLogoUrl();
+    const logoHtml = logoUrl 
+      ? `<img src="${logoUrl.startsWith('http') ? logoUrl : `cid:logo`}" alt="Ecopower Logo" style="max-width: 120px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" width="120" height="auto" />`
+      : '';
+    
+    const attachments = [];
+    if (logoUrl && !logoUrl.startsWith('http')) {
+      attachments.push({
+        filename: 'logo.png',
+        path: logoUrl,
+        cid: 'logo'
+      });
+    }
+
+    const mailOptions = {
+      from: `"Ecopower" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Invitation Ecopower - Connectez-vous avec Google',
+      attachments: attachments.length > 0 ? attachments : undefined,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #FFA800 0%, #E69500 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .info-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4285F4; }
+            .steps { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .step { padding: 10px 0; border-bottom: 1px solid #eee; }
+            .step:last-child { border-bottom: none; }
+            .step-number { display: inline-block; width: 30px; height: 30px; background: #4285F4; color: white; border-radius: 50%; text-align: center; line-height: 30px; font-weight: bold; margin-right: 10px; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              ${logoHtml}
+              <h1 style="margin-top: ${logoHtml ? '10px' : '0'}; margin-bottom: 0;">Bienvenue sur Ecopower</h1>
+            </div>
+            <div class="content">
+              <p>Bonjour ${fullName || 'Utilisateur'},</p>
+              <p>Vous avez été ajouté comme résident${maisonName ? ` pour la maison "${maisonName}"` : ''} sur Ecopower.</p>
+              
+              <div class="info-box">
+                <p><strong>📧 Email de connexion :</strong> ${email}</p>
+                <p><strong>🔐 Méthode de connexion :</strong> Google Sign-In</p>
+              </div>
+
+              <div class="steps">
+                <p><strong>Pour vous connecter :</strong></p>
+                <div class="step">
+                  <span class="step-number">1</span>
+                  <strong>Ouvrez l'application Ecopower</strong>
+                </div>
+                <div class="step">
+                  <span class="step-number">2</span>
+                  <strong>Cliquez sur "Se connecter avec Google"</strong>
+                </div>
+                <div class="step">
+                  <span class="step-number">3</span>
+                  <strong>Sélectionnez votre compte Google : ${email}</strong>
+                </div>
+                <div class="step">
+                  <span class="step-number">4</span>
+                  <strong>Vous serez automatiquement connecté !</strong>
+                </div>
+              </div>
+
+              <p style="margin-top: 20px;"><strong>💡 Astuce :</strong> Assurez-vous d'utiliser le compte Google associé à l'email ${email}.</p>
+
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Ecopower - Gestion de consommation électrique</p>
+                <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+Bonjour ${fullName || 'Utilisateur'},
+
+Vous avez été ajouté comme résident${maisonName ? ` pour la maison "${maisonName}"` : ''} sur Ecopower.
+
+📧 Email de connexion : ${email}
+🔐 Méthode de connexion : Google Sign-In
+
+Pour vous connecter :
+1. Ouvrez l'application Ecopower
+2. Cliquez sur "Se connecter avec Google"
+3. Sélectionnez votre compte Google : ${email}
+4. Vous serez automatiquement connecté !
+
+💡 Astuce : Assurez-vous d'utiliser le compte Google associé à l'email ${email}.
+
+© ${new Date().getFullYear()} Ecopower
+      `.trim(),
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log('✅ [EMAIL] Invitation Google Sign-In envoyée avec succès:', info.messageId);
+    
+    return {
+      success: true,
+      messageId: info.messageId,
+      sentAt: new Date(),
+      to: email,
+      mode: 'production'
+    };
+  } catch (error) {
+    console.error('❌ [EMAIL] Erreur lors de l\'envoi de l\'invitation:', error);
+    
+    return {
+      success: false,
+      error: error.message,
+      mode: 'error_fallback'
+    };
+  }
+};
+
 // Envoyer un email de contact depuis le formulaire du site web
 const sendContactEmail = async (contactData) => {
   try {
@@ -524,6 +671,7 @@ Pour répondre, répondez directement à cet email.
 module.exports = {
   sendPasswordResetEmail,
   sendCredentialsEmail,
+  sendGoogleInvitationEmail,
   sendContactEmail
 };
 
