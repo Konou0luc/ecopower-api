@@ -770,68 +770,148 @@ const getLogs = async (req, res) => {
 // Tester l'envoi d'une notification FCM à un utilisateur
 const testNotification = async (req, res) => {
   try {
-    const { userId, message } = req.body;
+    const { userId, deviceToken, message } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ message: 'userId requis' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-
-    if (!user.deviceToken) {
+    // Vérifier qu'au moins userId ou deviceToken est fourni
+    if (!userId && !deviceToken) {
       return res.status(400).json({ 
-        message: 'L\'utilisateur n\'a pas de deviceToken enregistré',
-        user: {
-          id: user._id,
-          nom: user.nom,
-          prenom: user.prenom,
-          email: user.email,
-          role: user.role
-        }
+        message: 'userId ou deviceToken requis',
+        hint: 'Utilisez userId (ObjectId MongoDB) OU deviceToken (token FCM) - pas les deux en même temps',
+        example1: { userId: '69419e5ee304dc2274b68f4d', message: 'Votre message' },
+        example2: { deviceToken: 'df2kNHZAQ0G-6aBcewt2k-:APA91b...', message: 'Votre message' }
       });
+    }
+
+    // Vérifier qu'on n'utilise pas les deux en même temps
+    if (userId && deviceToken) {
+      return res.status(400).json({ 
+        message: 'Utilisez soit userId, soit deviceToken, pas les deux',
+        hint: 'Si vous avez un userId, utilisez uniquement userId. Si vous avez un deviceToken, utilisez uniquement deviceToken.'
+      });
+    }
+
+    let user = null;
+    let finalDeviceToken = null;
+
+    // Si un deviceToken est fourni directement, l'utiliser
+    if (deviceToken) {
+      finalDeviceToken = deviceToken;
+      // Optionnellement, chercher l'utilisateur associé à ce token
+      user = await User.findOne({ deviceToken: deviceToken });
+    } 
+    // Sinon, chercher l'utilisateur par userId
+    else if (userId) {
+      // Vérifier si c'est un ObjectId valide
+      if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ 
+          message: 'userId invalide. Format attendu: ObjectId MongoDB (24 caractères hexadécimaux)',
+          received: userId,
+          hint: 'Si vous avez un deviceToken, utilisez le champ "deviceToken" au lieu de "userId"'
+        });
+      }
+
+      user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+
+      if (!user.deviceToken) {
+        return res.status(400).json({ 
+          message: 'L\'utilisateur n\'a pas de deviceToken enregistré',
+          user: {
+            id: user._id,
+            nom: user.nom,
+            prenom: user.prenom,
+            email: user.email,
+            role: user.role
+          }
+        });
+      }
+      finalDeviceToken = user.deviceToken;
     }
 
     const notifications = require('../utils/notifications');
     const testMessage = message || `Notification de test - ${new Date().toLocaleString('fr-FR')}`;
     
-    const result = await notifications.envoyer(userId, testMessage);
-
-    if (result.success) {
-      res.json({
-        message: 'Notification envoyée avec succès',
-        user: {
-          id: user._id,
-          nom: user.nom,
-          prenom: user.prenom,
-          email: user.email,
-          role: user.role,
-          deviceToken: user.deviceToken.substring(0, 20) + '...' // Masquer le token complet
-        },
+    // Utiliser la fonction d'envoi directe avec deviceToken
+    const admin = require('../config/firebase');
+    const messagePayload = {
+      notification: {
+        title: 'Ecopower',
+        body: testMessage
+      },
+      data: {
+        type: 'test',
+        timestamp: new Date().toISOString()
+      },
+      token: finalDeviceToken,
+      android: {
+        priority: 'high',
         notification: {
-          message: testMessage,
-          sentAt: new Date(),
-          response: result.response
+          sound: 'default',
+          channelId: 'ecopower_default'
         }
-      });
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10'
+        },
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1
+          }
+        }
+      }
+    };
+
+    console.log(`🔔 Envoi de notification de test`);
+    console.log(`📱 Device Token (preview): ${finalDeviceToken.substring(0, 20)}...`);
+    
+    const response = await admin.messaging().send(messagePayload);
+    console.log('✅ FCM envoyé avec succès. Message ID:', response);
+
+    const result = {
+      message: 'Notification envoyée avec succès',
+      notification: {
+        message: testMessage,
+        sentAt: new Date(),
+        messageId: response
+      }
+    };
+
+    if (user) {
+      result.user = {
+        id: user._id,
+        nom: user.nom,
+        prenom: user.prenom,
+        email: user.email,
+        role: user.role,
+        deviceToken: user.deviceToken ? user.deviceToken.substring(0, 20) + '...' : 'N/A'
+      };
     } else {
-      res.status(500).json({
-        message: 'Erreur lors de l\'envoi de la notification',
-        error: result.error,
-        user: {
-          id: user._id,
-          nom: user.nom,
-          prenom: user.prenom,
-          email: user.email,
-          role: user.role
-        }
-      });
+      result.deviceToken = finalDeviceToken.substring(0, 20) + '...';
+      result.note = 'Aucun utilisateur associé à ce deviceToken trouvé dans la base de données';
     }
+
+    res.json(result);
   } catch (error) {
     console.error('Erreur lors du test de notification:', error);
-    res.status(500).json({ message: 'Erreur lors du test de notification', error: error.message });
+    
+    // Gestion spécifique des erreurs Firebase
+    let errorMessage = error.message;
+    if (error.code === 'messaging/invalid-registration-token' || 
+        error.code === 'messaging/registration-token-not-registered') {
+      errorMessage = 'Le deviceToken est invalide ou expiré. L\'utilisateur doit se reconnecter.';
+    } else if (error.code === 'messaging/sender-id-mismatch') {
+      errorMessage = 'Le deviceToken a été généré avec un projet Firebase différent. Vérifiez la configuration Firebase.';
+    }
+    
+    res.status(500).json({ 
+      message: 'Erreur lors du test de notification', 
+      error: errorMessage,
+      code: error.code || 'UNKNOWN_ERROR'
+    });
   }
 };
 

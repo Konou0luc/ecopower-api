@@ -7,7 +7,8 @@
     "dev": "nodemon app.js",
     "server": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fix-index": "node scripts/fixGoogleIdIndex.js"
+    "fix-index": "node scripts/fixGoogleIdIndex.js",
+    "test-notification": "node scripts/test-notification.js"
   },
   "keywords": [],
   "author": "",
