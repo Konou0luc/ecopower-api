@@ -81,7 +81,16 @@ const userSchema = new mongoose.Schema(
 );
 
 // Validation personnalisée : au moins googleId ou motDePasse doit être présent
+// Exception : les résidents avec authMethod: 'google' peuvent être créés sans googleId
+// (ils seront créés par le propriétaire avant leur première connexion Google)
 userSchema.pre("validate", function (next) {
+  // Si c'est un résident avec authMethod: 'google', permettre la création sans googleId
+  // Le googleId sera ajouté lors de la première connexion Google
+  if (this.role === 'resident' && this.authMethod === 'google' && !this.googleId && !this.motDePasse) {
+    return next(); // Autoriser la création
+  }
+  
+  // Pour les autres cas, au moins googleId ou motDePasse doit être présent
   if (!this.googleId && !this.motDePasse) {
     const error = new Error('Au moins une méthode d\'authentification est requise (Google ou mot de passe)');
     return next(error);

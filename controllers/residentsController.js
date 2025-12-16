@@ -163,8 +163,21 @@ const addResident = async (req, res) => {
       invitationSent
     });
   } catch (error) {
-    console.error("Erreur lors de l'ajout du résident:", error);
-    res.status(500).json({ message: "Erreur lors de l'ajout du résident" });
+    console.error("❌ [RESIDENTS] Erreur lors de l'ajout du résident:", error);
+    console.error("❌ [RESIDENTS] Stack trace:", error.stack);
+    console.error("❌ [RESIDENTS] Détails:", {
+      nom,
+      prenom,
+      email,
+      telephone,
+      maisonId,
+      errorMessage: error.message,
+      errorName: error.name
+    });
+    res.status(500).json({ 
+      message: "Erreur lors de l'ajout du résident",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
