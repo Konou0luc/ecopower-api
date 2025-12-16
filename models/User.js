@@ -34,8 +34,8 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String,
       unique: true,
-      sparse: true, // Permet plusieurs null
-      default: null,
+      sparse: true, // Permet plusieurs null - l'index ignore les documents sans ce champ
+      default: undefined, // Ne pas définir par défaut pour éviter les conflits d'index
     },
     authMethod: {
       type: String,

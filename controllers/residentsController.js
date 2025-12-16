@@ -6,7 +6,6 @@ const Facture = require('../models/Facture');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const Log = require('../models/Log');
-const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
 const notifications = require('../utils/notifications');
 
 // Obtenir les résidents de la maison de l'utilisateur connecté
@@ -68,8 +67,9 @@ const getMyHouseResidents = async (req, res) => {
 
 // Ajouter un résident
 const addResident = async (req, res) => {
+  const { nom, prenom, email, telephone, maisonId } = req.body;
+  
   try {
-    const { nom, prenom, email, telephone, maisonId } = req.body;
 
     // Vérifier si l'email existe déjà
     const existingUser = await User.findOne({ email });
@@ -88,12 +88,13 @@ const addResident = async (req, res) => {
     }
 
     // Créer le résident sans mot de passe (authentification Google uniquement)
+    // Ne pas définir googleId (sera ajouté lors de la première connexion Google)
+    // Ne pas définir motDePasse (null par défaut)
     const resident = new User({
       nom,
       prenom,
       email,
       telephone,
-      motDePasse: null, // Pas de mot de passe, authentification Google uniquement
       authMethod: 'google', // Les résidents utilisent Google Sign-In
       role: 'resident',
       idProprietaire: req.user._id,
