@@ -1,6 +1,7 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 const { uploadBufferToCloudinary, cloudinary } = require('../middlewares/upload');
+const notifications = require('../utils/notifications');
 
 // POST /messages/file -> créer un message avec fichier
 exports.createFileMessage = async (req, res) => {
@@ -82,6 +83,22 @@ exports.createFileMessage = async (req, res) => {
       fileUrl: message.metadata.fileUrl,
       maisonId: maisonId,
     });
+
+    // Notification push uniquement si c'est le gérant qui envoie au résident
+    if (req.user.role === 'proprietaire' && receiverId && receiverId.trim() !== '') {
+      try {
+        const receiver = await User.findById(receiverId);
+        if (receiver && receiver.role === 'resident') {
+          const fileTypeLabel = fileType === 'image' ? 'une image' : 
+                               fileType === 'video' ? 'une vidéo' : 
+                               fileType === 'audio' ? 'un audio' : 'un fichier';
+          await notifications.envoyer(receiverId, `Nouveau message de ${req.user.nomComplet || req.user.prenom + ' ' + req.user.nom}: ${fileTypeLabel}`);
+          console.log(`✅ Notification message fichier API envoyée au résident ${receiverId}`);
+        }
+      } catch (e) {
+        console.error('Notif push (message fichier API) échouée:', e?.message || e);
+      }
+    }
 
     res.status(201).json({
       message: 'Message avec fichier envoyé avec succès',
@@ -256,6 +273,22 @@ exports.createMessage = async (req, res) => {
       contenu: message.contenu.substring(0, 50) + '...',
       maisonId: maisonId,
     });
+
+    // Notification push uniquement si c'est le gérant qui envoie au résident
+    if (req.user.role === 'proprietaire' && receiverId && receiverId.trim() !== '') {
+      try {
+        const receiver = await User.findById(receiverId);
+        if (receiver && receiver.role === 'resident') {
+          const messagePreview = contenu.trim().length > 50 
+            ? contenu.trim().substring(0, 50) + '...' 
+            : contenu.trim();
+          await notifications.envoyer(receiverId, `Nouveau message de ${req.user.nomComplet || req.user.prenom + ' ' + req.user.nom}: ${messagePreview}`);
+          console.log(`✅ Notification message API envoyée au résident ${receiverId}`);
+        }
+      } catch (e) {
+        console.error('Notif push (message API) échouée:', e?.message || e);
+      }
+    }
 
     res.status(201).json({
       message: 'Message envoyé avec succès',

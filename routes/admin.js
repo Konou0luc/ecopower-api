@@ -48,4 +48,7 @@ router.get('/system/info', systemController.getSystemInfo);
 // Test des notifications FCM
 router.post('/test/notification', adminController.testNotification);
 
+// Diffusion de notifications à tous les utilisateurs
+router.post('/broadcast/notification', adminController.broadcastNotification);
+
 module.exports = router;

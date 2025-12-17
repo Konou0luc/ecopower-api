@@ -915,6 +915,152 @@ const testNotification = async (req, res) => {
   }
 };
 
+// Envoyer une notification à tous les utilisateurs
+const broadcastNotification = async (req, res) => {
+  try {
+    const { message, title, role } = req.body;
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ 
+        message: 'Le message est requis',
+        hint: 'Le message ne peut pas être vide'
+      });
+    }
+
+    const notificationTitle = title || 'Ecopower';
+    const finalMessage = message.trim();
+
+    // Construire le filtre pour les utilisateurs
+    const filter = {
+      deviceToken: { $exists: true, $ne: null, $nin: ['', null] }
+    };
+
+    // Filtrer par rôle si spécifié
+    if (role && ['proprietaire', 'resident', 'admin'].includes(role)) {
+      filter.role = role;
+    }
+
+    // Récupérer tous les utilisateurs avec deviceToken
+    const users = await User.find(filter).select('_id nom prenom email role deviceToken');
+    
+    if (users.length === 0) {
+      return res.status(404).json({ 
+        message: 'Aucun utilisateur avec deviceToken trouvé',
+        filter: role ? `Rôle: ${role}` : 'Tous les rôles'
+      });
+    }
+
+    console.log(`📢 [BROADCAST] Envoi de notification à ${users.length} utilisateur(s)`);
+    if (role) {
+      console.log(`   Filtre: Rôle = ${role}`);
+    }
+
+    const admin = require('../config/firebase');
+    
+    const results = {
+      total: users.length,
+      success: 0,
+      failed: 0,
+      details: []
+    };
+
+    // Envoyer les notifications en parallèle (par lots pour éviter la surcharge)
+    const batchSize = 10;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      
+      await Promise.allSettled(
+        batch.map(async (user) => {
+          try {
+            const messagePayload = {
+              notification: {
+                title: notificationTitle,
+                body: finalMessage
+              },
+              data: {
+                userId: user._id.toString(),
+                type: 'broadcast',
+                role: user.role
+              },
+              token: user.deviceToken,
+              android: {
+                priority: 'high',
+                notification: {
+                  sound: 'default',
+                  channelId: 'ecopower_default'
+                }
+              },
+              apns: {
+                headers: {
+                  'apns-priority': '10'
+                },
+                payload: {
+                  aps: {
+                    sound: 'default',
+                    badge: 1
+                  }
+                }
+              }
+            };
+
+            const response = await admin.messaging().send(messagePayload);
+            results.success++;
+            results.details.push({
+              userId: user._id.toString(),
+              email: user.email,
+              role: user.role,
+              status: 'success',
+              messageId: response
+            });
+            console.log(`✅ Notification envoyée à ${user.email} (${user.role})`);
+          } catch (error) {
+            results.failed++;
+            results.details.push({
+              userId: user._id.toString(),
+              email: user.email,
+              role: user.role,
+              status: 'failed',
+              error: error.message,
+              errorCode: error.code
+            });
+            console.error(`❌ Erreur pour ${user.email}:`, error.message);
+          }
+        })
+      );
+
+      // Petite pause entre les lots pour éviter la surcharge
+      if (i + batchSize < users.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`📊 [BROADCAST] Résultats: ${results.success} succès, ${results.failed} échecs sur ${results.total} total`);
+
+    res.json({
+      message: 'Diffusion de notification terminée',
+      summary: {
+        total: results.total,
+        success: results.success,
+        failed: results.failed,
+        successRate: results.total > 0 ? ((results.success / results.total) * 100).toFixed(2) + '%' : '0%'
+      },
+      notification: {
+        title: notificationTitle,
+        message: finalMessage,
+        sentAt: new Date(),
+        filter: role || 'Tous les utilisateurs'
+      },
+      details: results.details
+    });
+  } catch (error) {
+    console.error('Erreur lors de la diffusion de notification:', error);
+    res.status(500).json({ 
+      message: 'Erreur lors de la diffusion de notification', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllUsers,
@@ -929,5 +1075,6 @@ module.exports = {
   getMessages,
   getNotifications,
   getLogs,
-  testNotification
+  testNotification,
+  broadcastNotification
 };

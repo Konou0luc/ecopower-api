@@ -124,12 +124,23 @@ const socketManager = (io) => {
             }
           });
         }
-        // Notification push si deviceToken disponible (via utils/notifications)
-        try {
-          const notifications = require('../utils/notifications');
-          await notifications.envoyer(receiverId, `Nouveau message de ${socket.userNom}`);
-        } catch (e) {
-          console.error('Notif push (privé) échouée:', e?.message || e);
+        
+        // Notification push uniquement si c'est le gérant qui envoie au résident
+        if (socket.userRole === 'proprietaire') {
+          try {
+            // Vérifier que le destinataire est un résident
+            const receiver = await User.findById(receiverId);
+            if (receiver && receiver.role === 'resident') {
+              const notifications = require('../utils/notifications');
+              const messagePreview = contenu.trim().length > 50 
+                ? contenu.trim().substring(0, 50) + '...' 
+                : contenu.trim();
+              await notifications.envoyer(receiverId, `Nouveau message de ${socket.userNom}: ${messagePreview}`);
+              console.log(`✅ Notification message privé envoyée au résident ${receiverId}`);
+            }
+          } catch (e) {
+            console.error('Notif push (privé) échouée:', e?.message || e);
+          }
         }
 
         // Confirmation à l'expéditeur
@@ -206,23 +217,26 @@ const socketManager = (io) => {
           }
         });
 
-        // Notifier les membres de la maison (hors émetteur)
-        try {
-          const maisonMembers = [];
-          // Ajouter le propriétaire
-          if (maison.proprietaireId) maisonMembers.push(maison.proprietaireId.toString());
-          // Ajouter les résidents
-          if (Array.isArray(maison.listeResidents)) {
-            maison.listeResidents.forEach(uid => maisonMembers.push(uid.toString()));
-          }
-          const notifications = require('../utils/notifications');
-          for (const uid of maisonMembers) {
-            if (uid !== socket.userId.toString()) {
-              await notifications.envoyer(uid, `Nouveau message dans ${maison._id.toString()}`);
+        // Notifier les résidents uniquement si c'est le gérant qui envoie le message
+        if (socket.userRole === 'proprietaire') {
+          try {
+            const notifications = require('../utils/notifications');
+            // Notifier uniquement les résidents (pas le gérant lui-même)
+            if (Array.isArray(maison.listeResidents)) {
+              const messagePreview = contenu.trim().length > 50 
+                ? contenu.trim().substring(0, 50) + '...' 
+                : contenu.trim();
+              for (const residentId of maison.listeResidents) {
+                const residentIdStr = residentId.toString();
+                if (residentIdStr !== socket.userId.toString()) {
+                  await notifications.envoyer(residentIdStr, `Nouveau message de ${socket.userNom}: ${messagePreview}`);
+                }
+              }
+              console.log(`✅ Notifications message groupe envoyées aux résidents de la maison ${maisonId}`);
             }
+          } catch (e) {
+            console.error('Notif push (groupe) échouée:', e?.message || e);
           }
-        } catch (e) {
-          console.error('Notif push (groupe) échouée:', e?.message || e);
         }
 
         // Confirmation à l'expéditeur

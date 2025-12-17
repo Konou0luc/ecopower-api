@@ -98,11 +98,15 @@ const generateFacture = async (req, res) => {
       );
     }
 
-    // Envoyer aussi une notification FCM au résident
-    try {
-      await notifications.envoyer(residentId, `Nouvelle facture ${numeroFacture}: ${montant} FCFA`);
-    } catch (e) {
-      console.error('FCM facture erreur:', e?.message || e);
+    // Envoyer une notification FCM au résident uniquement si c'est le gérant qui génère la facture
+    if (req.user.role === 'proprietaire') {
+      try {
+        const messageFacture = `Nouvelle facture ${numeroFacture}: ${montant.toFixed(2)} FCFA. Échéance: ${dateEcheance.toLocaleDateString('fr-FR')}`;
+        await notifications.envoyer(residentId, messageFacture);
+        console.log(`✅ Notification facture envoyée au résident ${residentId}`);
+      } catch (e) {
+        console.error('FCM facture erreur:', e?.message || e);
+      }
     }
 
     res.status(201).json({
