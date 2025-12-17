@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Maison = require('../models/Maison');
 const Consommation = require('../models/Consommation');
@@ -374,11 +375,18 @@ const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Vérifier que l'ID est valide
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID utilisateur invalide' });
+    }
+
     // Vérifier que l'utilisateur existe
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
+
+    console.log(`🗑️ [DELETE USER] Début de la suppression de l'utilisateur ${id} (${user.role})`);
 
     // Ne pas permettre la suppression d'un admin si c'est le dernier
     if (user.role === 'admin') {
@@ -392,37 +400,72 @@ const deleteUser = async (req, res) => {
 
     // 1. Si l'utilisateur est un propriétaire, gérer ses maisons et abonnements
     if (user.role === 'proprietaire') {
+      console.log(`🗑️ [DELETE USER] Suppression des maisons du propriétaire ${id}`);
+      
       // Récupérer toutes les maisons du propriétaire
       const maisons = await Maison.find({ proprietaireId: id });
+      console.log(`🗑️ [DELETE USER] ${maisons.length} maison(s) trouvée(s) pour le propriétaire ${id}`);
       
-      // Pour chaque maison, supprimer toutes les données associées
-      for (const maison of maisons) {
-        // Supprimer les consommations liées aux résidents de cette maison
-        const residentsIds = maison.listeResidents || [];
-        await Consommation.deleteMany({ 
-          $or: [
-            { maisonId: maison._id },
-            { residentId: { $in: residentsIds } }
-          ]
-        });
+      if (maisons.length > 0) {
+        // Collecter tous les IDs de résidents de toutes les maisons
+        const tousResidentsIds = [];
+        const toutesMaisonsIds = [];
+        
+        for (const maison of maisons) {
+          toutesMaisonsIds.push(maison._id);
+          if (maison.listeResidents && maison.listeResidents.length > 0) {
+            tousResidentsIds.push(...maison.listeResidents.map(r => r.toString()));
+          }
+        }
+        
+        // Supprimer toutes les consommations liées aux maisons et résidents
+        if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
+          const consommationQuery = {
+            $or: []
+          };
+          if (toutesMaisonsIds.length > 0) {
+            consommationQuery.$or.push({ maisonId: { $in: toutesMaisonsIds } });
+          }
+          if (tousResidentsIds.length > 0) {
+            consommationQuery.$or.push({ residentId: { $in: tousResidentsIds } });
+          }
+          if (consommationQuery.$or.length > 0) {
+            const consommationsDeleted = await Consommation.deleteMany(consommationQuery);
+            console.log(`🗑️ [DELETE USER] ${consommationsDeleted.deletedCount} consommation(s) supprimée(s)`);
+          }
+        }
 
-        // Supprimer les factures liées aux résidents de cette maison
-        await Facture.deleteMany({ 
-          $or: [
-            { maisonId: maison._id },
-            { residentId: { $in: residentsIds } }
-          ]
-        });
+        // Supprimer toutes les factures liées aux maisons et résidents
+        if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
+          const factureQuery = {
+            $or: []
+          };
+          if (toutesMaisonsIds.length > 0) {
+            factureQuery.$or.push({ maisonId: { $in: toutesMaisonsIds } });
+          }
+          if (tousResidentsIds.length > 0) {
+            factureQuery.$or.push({ residentId: { $in: tousResidentsIds } });
+          }
+          if (factureQuery.$or.length > 0) {
+            const facturesDeleted = await Facture.deleteMany(factureQuery);
+            console.log(`🗑️ [DELETE USER] ${facturesDeleted.deletedCount} facture(s) supprimée(s)`);
+          }
+        }
 
-        // Supprimer les résidents de cette maison
-        await User.deleteMany({ _id: { $in: residentsIds } });
+        // Supprimer tous les résidents de ces maisons
+        if (tousResidentsIds.length > 0) {
+          const residentsDeleted = await User.deleteMany({ _id: { $in: tousResidentsIds } });
+          console.log(`🗑️ [DELETE USER] ${residentsDeleted.deletedCount} résident(s) supprimé(s)`);
+        }
 
-        // Supprimer la maison
-        await Maison.findByIdAndDelete(maison._id);
+        // Supprimer toutes les maisons en une seule requête
+        const maisonsDeleted = await Maison.deleteMany({ proprietaireId: id });
+        console.log(`🗑️ [DELETE USER] ${maisonsDeleted.deletedCount} maison(s) supprimée(s)`);
       }
 
       // Supprimer les abonnements du propriétaire
-      await Abonnement.deleteMany({ proprietaireId: id });
+      const abonnementsDeleted = await Abonnement.deleteMany({ proprietaireId: id });
+      console.log(`🗑️ [DELETE USER] ${abonnementsDeleted.deletedCount} abonnement(s) supprimé(s)`);
     }
 
     // 2. Si l'utilisateur est un résident
@@ -594,7 +637,7 @@ const getResidents = async (req, res) => {
 const deleteResident = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Vérifier que le résident existe
     const resident = await User.findById(id);
     if (!resident) {
