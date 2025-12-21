@@ -38,6 +38,9 @@ router.get('/me', authenticateToken, authController.getCurrentUser);
 // POST /auth/device-token - Enregistrer le token FCM de l'utilisateur
 router.post('/device-token', authenticateToken, authController.setDeviceToken);
 
+// DELETE /auth/account - Supprimer son propre compte
+router.delete('/account', authenticateToken, authController.deleteMyAccount);
+
 /**
  * Route admin à ajouter dans un futur UsersController:
  * PATCH /users/:id/make-admin

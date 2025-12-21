@@ -670,6 +670,146 @@ const googleAuth = async (req, res) => {
   }
 };
 
+// Supprimer son propre compte
+const deleteMyAccount = async (req, res) => {
+  try {
+    const { motDePasse } = req.body;
+    const userId = req.user._id;
+
+    // Recharger l'utilisateur avec le mot de passe
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Ne pas permettre la suppression d'un admin si c'est le dernier
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'Impossible de supprimer le dernier administrateur' });
+      }
+    }
+
+    // Vérifier le mot de passe (sauf pour les utilisateurs Google qui n'ont pas de mot de passe)
+    if (user.authMethod === 'email' && user.motDePasse) {
+      if (!motDePasse) {
+        return res.status(400).json({ message: 'Mot de passe requis pour supprimer votre compte' });
+      }
+      const isPasswordValid = await user.comparePassword(motDePasse);
+      if (!isPasswordValid) {
+        return res.status(400).json({ message: 'Mot de passe incorrect' });
+      }
+    }
+
+    console.log(`🗑️ [DELETE MY ACCOUNT] Début de la suppression du compte ${userId} (${user.role})`);
+
+    // Réutiliser la logique de suppression en cascade de adminController
+    const Maison = require('../models/Maison');
+    const Consommation = require('../models/Consommation');
+    const Facture = require('../models/Facture');
+    const Message = require('../models/Message');
+    const Notification = require('../models/Notification');
+    const Log = require('../models/Log');
+    const Abonnement = require('../models/Abonnement');
+
+    // 1. Si l'utilisateur est un propriétaire, gérer ses maisons et abonnements
+    if (user.role === 'proprietaire') {
+      const maisons = await Maison.find({ proprietaireId: userId });
+      
+      if (maisons.length > 0) {
+        const tousResidentsIds = [];
+        const toutesMaisonsIds = [];
+        
+        for (const maison of maisons) {
+          toutesMaisonsIds.push(maison._id);
+          if (maison.listeResidents && maison.listeResidents.length > 0) {
+            tousResidentsIds.push(...maison.listeResidents.map(r => r.toString()));
+          }
+        }
+        
+        // Supprimer toutes les consommations
+        if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
+          const consommationQuery = { $or: [] };
+          if (toutesMaisonsIds.length > 0) {
+            consommationQuery.$or.push({ maisonId: { $in: toutesMaisonsIds } });
+          }
+          if (tousResidentsIds.length > 0) {
+            consommationQuery.$or.push({ residentId: { $in: tousResidentsIds } });
+          }
+          if (consommationQuery.$or.length > 0) {
+            await Consommation.deleteMany(consommationQuery);
+          }
+        }
+
+        // Supprimer toutes les factures
+        if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
+          const factureQuery = { $or: [] };
+          if (toutesMaisonsIds.length > 0) {
+            factureQuery.$or.push({ maisonId: { $in: toutesMaisonsIds } });
+          }
+          if (tousResidentsIds.length > 0) {
+            factureQuery.$or.push({ residentId: { $in: tousResidentsIds } });
+          }
+          if (factureQuery.$or.length > 0) {
+            await Facture.deleteMany(factureQuery);
+          }
+        }
+
+        // Supprimer tous les résidents
+        if (tousResidentsIds.length > 0) {
+          await User.deleteMany({ _id: { $in: tousResidentsIds } });
+        }
+
+        // Supprimer toutes les maisons
+        await Maison.deleteMany({ proprietaireId: userId });
+      }
+
+      // Supprimer les abonnements
+      await Abonnement.deleteMany({ proprietaireId: userId });
+    }
+
+    // 2. Si l'utilisateur est un résident
+    if (user.role === 'resident') {
+      await Maison.updateMany(
+        { listeResidents: userId },
+        { $pull: { listeResidents: userId } }
+      );
+      await Consommation.deleteMany({ residentId: userId });
+      await Facture.deleteMany({ residentId: userId });
+    }
+
+    // 3. Supprimer les messages
+    await Message.deleteMany({
+      $or: [
+        { expediteur: userId },
+        { destinataire: userId }
+      ]
+    });
+
+    // 4. Supprimer les notifications
+    await Notification.deleteMany({ destinataire: userId });
+
+    // 5. Supprimer les logs
+    await Log.deleteMany({ user: userId });
+
+    // 6. Mettre à jour les références idProprietaire
+    await User.updateMany(
+      { idProprietaire: userId },
+      { $set: { idProprietaire: null } }
+    );
+
+    // 7. Supprimer l'utilisateur
+    await User.findByIdAndDelete(userId);
+
+    console.log(`✅ [DELETE MY ACCOUNT] Compte ${userId} supprimé avec succès`);
+
+    res.json({ message: 'Votre compte et toutes vos données ont été supprimés avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du compte:', error);
+    res.status(500).json({ message: 'Erreur lors de la suppression du compte', error: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -680,5 +820,6 @@ module.exports = {
   changePassword,
   getCurrentUser,
   setDeviceToken,
-  forgotPassword
+  forgotPassword,
+  deleteMyAccount
 };
