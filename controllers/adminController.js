@@ -177,6 +177,69 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+// Obtenir un utilisateur par ID (admin)
+const getUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que l'ID est valide
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID utilisateur invalide' });
+    }
+
+    // Récupérer l'utilisateur avec ses relations
+    const user = await User.findById(id)
+      .select('-motDePasse -refreshToken')
+      .populate('maisonId', 'nomMaison adresse')
+      .populate('abonnementId', 'typeAbonnement statut dateDebut dateFin')
+      .populate('idProprietaire', 'nom prenom email telephone');
+
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Compter les statistiques liées à l'utilisateur
+    let stats = {};
+    
+    if (user.role === 'proprietaire') {
+      // Statistiques pour un propriétaire
+      const maisonsIds = await Maison.find({ proprietaireId: id }).distinct('_id');
+      const [maisonsCount, facturesCount, consommationsCount] = await Promise.all([
+        Maison.countDocuments({ proprietaireId: id }),
+        Facture.countDocuments({ maisonId: { $in: maisonsIds } }),
+        Consommation.countDocuments({ maisonId: { $in: maisonsIds } })
+      ]);
+      
+      stats = {
+        maisons: maisonsCount,
+        factures: facturesCount,
+        consommations: consommationsCount
+      };
+    } else if (user.role === 'resident') {
+      // Statistiques pour un résident
+      const [consommationsCount, facturesCount] = await Promise.all([
+        Consommation.countDocuments({ residentId: id }),
+        Facture.countDocuments({ residentId: id })
+      ]);
+      
+      stats = {
+        consommations: consommationsCount,
+        factures: facturesCount
+      };
+    }
+
+    res.json({
+      user: {
+        ...user.toObject(),
+        stats
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'utilisateur:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération de l\'utilisateur' });
+  }
+};
+
 // Obtenir toutes les maisons (admin)
 const getAllMaisons = async (req, res) => {
   try {
@@ -1107,6 +1170,7 @@ const broadcastNotification = async (req, res) => {
 module.exports = {
   getDashboardStats,
   getAllUsers,
+  getUser,
   getAllMaisons,
   getAllConsommations,
   getAllFactures,

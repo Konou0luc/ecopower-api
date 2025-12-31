@@ -13,6 +13,7 @@ router.get('/dashboard/stats', adminController.getDashboardStats);
 
 // Gestion des utilisateurs
 router.get('/users', adminController.getAllUsers);
+router.get('/users/:id', adminController.getUser);
 router.delete('/users/:id', adminController.deleteUser);
 
 // Gestion des maisons
