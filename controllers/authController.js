@@ -4,10 +4,8 @@ const User = require('../models/User');
 const Abonnement = require('../models/Abonnement');
 const { generateTemporaryPassword } = require('../utils/passwordUtils');
 
-// Initialiser le client Google OAuth2
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Générer les tokens JWT
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
     { userId },
@@ -24,21 +22,17 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-// Enregistrement d'un propriétaire
 const register = async (req, res) => {
   try {
     const { nom, prenom, email, telephone, motDePasse, role } = req.body;
 
-    // Vérifier si l'email existe déjà
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Cet email est déjà utilisé' });
     }
 
-    // Vérifier si c'est une demande de création d'admin
     const isAdminRequest = role === 'admin';
-    
-    // Si c'est une demande d'admin, vérifier s'il n'y a pas déjà un admin
+
     if (isAdminRequest) {
       const existingAdmin = await User.findOne({ role: 'admin' });
       if (existingAdmin) {
@@ -46,7 +40,6 @@ const register = async (req, res) => {
       }
     }
 
-    // Créer l'utilisateur
     const user = new User({
       nom,
       prenom,
@@ -58,10 +51,8 @@ const register = async (req, res) => {
 
     await user.save();
 
-    // Générer les tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Sauvegarder le refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
@@ -81,7 +72,6 @@ const register = async (req, res) => {
 
 const FREE_MODE = process.env.FREE_MODE === 'true';
 
-// Connexion
 const login = async (req, res) => {
   try {
     console.log('🔐 [LOGIN] Tentative de connexion reçue');
@@ -95,17 +85,14 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Email et mot de passe requis' });
     }
 
-    // Normaliser les identifiants (évite les erreurs de casse/espaces)
     const normalizedEmail = (email || '').toString().trim().toLowerCase();
     const normalizedPassword = (motDePasse || '').toString().trim();
 
     console.log('🔐 [LOGIN] Email normalisé:', normalizedEmail);
     console.log('🔐 [LOGIN] Recherche de l\'utilisateur...');
 
-    // Vérifier si l'utilisateur existe (par email normalisé ou téléphone saisi à la place de l'email)
     let user = await User.findOne({ email: normalizedEmail });
     if (!user && email) {
-      // Si l'utilisateur a saisi son téléphone à la place de l'email
       user = await User.findOne({ telephone: (email || '').toString().trim() });
     }
     
@@ -116,7 +103,6 @@ const login = async (req, res) => {
 
     console.log('✅ [LOGIN] Utilisateur trouvé:', user.email, 'Role:', user.role);
 
-    // Vérifier si l'utilisateur utilise Google Sign-In
     if (user.authMethod === 'google' || !user.motDePasse) {
       console.log('❌ [LOGIN] Cet utilisateur utilise Google Sign-In');
       return res.status(400).json({ 
@@ -125,7 +111,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Vérifier le mot de passe
     const isPasswordValid = await user.comparePassword(normalizedPassword);
     if (!isPasswordValid) {
       console.log('❌ [LOGIN] Mot de passe incorrect pour:', normalizedEmail);
@@ -134,14 +119,11 @@ const login = async (req, res) => {
 
     console.log('✅ [LOGIN] Mot de passe valide');
 
-    // Générer les tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Sauvegarder le refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Récupérer l'abonnement si c'est un propriétaire
     let abonnement = null;
     if (FREE_MODE) {
       const now = new Date();
@@ -181,7 +163,6 @@ const login = async (req, res) => {
   }
 };
 
-// Refresh token
 const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -197,10 +178,8 @@ const refreshToken = async (req, res) => {
       return res.status(401).json({ message: 'Refresh token invalide' });
     }
 
-    // Générer de nouveaux tokens
     const tokens = generateTokens(user._id);
 
-    // Sauvegarder le nouveau refresh token
     user.refreshToken = tokens.refreshToken;
     await user.save();
 
@@ -214,10 +193,8 @@ const refreshToken = async (req, res) => {
   }
 };
 
-// Déconnexion
 const logout = async (req, res) => {
   try {
-    // Supprimer le refresh token
     req.user.refreshToken = null;
     await req.user.save();
 
@@ -228,7 +205,6 @@ const logout = async (req, res) => {
   }
 };
 
-// Changement de mot de passe (pour premier login)
 const resetPassword = async (req, res) => {
   try {
     const { nouveauMotDePasse } = req.body;
@@ -237,7 +213,6 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Cette opération n\'est pas nécessaire' });
     }
 
-    // Mettre à jour le mot de passe
     req.user.motDePasse = nouveauMotDePasse;
     req.user.firstLogin = false;
     await req.user.save();
@@ -252,24 +227,20 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// Changement de mot de passe normal
 const changePassword = async (req, res) => {
   try {
     const { motDePasseActuel, nouveauMotDePasse } = req.body;
 
-    // Recharger l'utilisateur avec le mot de passe (le middleware exclut ce champ)
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Vérifier l'ancien mot de passe
     const isPasswordValid = await user.comparePassword(motDePasseActuel);
     if (!isPasswordValid) {
       return res.status(400).json({ message: 'Mot de passe actuel incorrect' });
     }
 
-    // Mettre à jour le mot de passe
     user.motDePasse = nouveauMotDePasse;
     await user.save();
 
@@ -280,19 +251,16 @@ const changePassword = async (req, res) => {
   }
 };
 
-// Récupérer les informations de l'utilisateur connecté
 const getCurrentUser = async (req, res) => {
   try {
     console.log('🔍 [API] Récupération des données utilisateur:', req.user._id);
-    
-    // Récupérer l'utilisateur avec ses données complètes
+
     const user = await User.findById(req.user._id).select('-motDePasse -refreshToken');
-    
+
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Récupérer l'abonnement si c'est un propriétaire
     let abonnement = null;
     if (FREE_MODE) {
       const now = new Date();
@@ -313,20 +281,17 @@ const getCurrentUser = async (req, res) => {
       }
     }
 
-    // Récupérer les maisons
     let maisons = [];
     const Maison = require('../models/Maison');
     if (user.role === 'proprietaire') {
       maisons = await Maison.find({ proprietaireId: user._id });
     } else if (user.role === 'resident') {
-      // Pour les résidents, récupérer leur maison via la liste des résidents
       const maison = await Maison.findOne({ listeResidents: user._id });
       if (maison) {
         maisons = [maison];
       }
     }
 
-    // Récupérer les résidents si c'est un propriétaire
     let residents = [];
     if (user.role === 'proprietaire') {
       residents = await User.find({ idProprietaire: user._id, role: 'resident' }).select('-motDePasse -refreshToken');
@@ -347,7 +312,34 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
-// Enregistrer/mettre à jour le device token FCM de l'utilisateur connecté
+const setHomeLocation = async (req, res) => {
+  try {
+    const { latitude, longitude, city, country } = req.body;
+
+    if (latitude == null || longitude == null || typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return res.status(400).json({ message: 'Latitude et longitude requises (nombres)' });
+    }
+
+    req.user.homeLatitude = latitude;
+    req.user.homeLongitude = longitude;
+    req.user.homeCity = city || null;
+    req.user.homeCountry = country || null;
+    req.user.homeLocationSource = 'gps';
+    await req.user.save();
+
+    return res.json({
+      message: 'Localisation du domicile enregistrée',
+      homeLatitude: req.user.homeLatitude,
+      homeLongitude: req.user.homeLongitude,
+      homeCity: req.user.homeCity,
+      homeCountry: req.user.homeCountry,
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de la localisation:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'enregistrement de la localisation' });
+  }
+};
+
 const setDeviceToken = async (req, res) => {
   try {
     const { deviceToken } = req.body;
@@ -369,17 +361,14 @@ const setDeviceToken = async (req, res) => {
   }
 };
 
-// Mot de passe oublié (pour tous les utilisateurs, sans authentification)
 const forgotPassword = async (req, res) => {
   try {
     const { email, telephone } = req.body;
 
-    // Vérifier qu'au moins un identifiant est fourni
     if (!email && !telephone) {
       return res.status(400).json({ message: 'Email ou téléphone requis' });
     }
 
-    // Rechercher l'utilisateur par email ou téléphone
     let user;
     if (email) {
       user = await User.findOne({ email: email.trim().toLowerCase() });
@@ -387,23 +376,18 @@ const forgotPassword = async (req, res) => {
       user = await User.findOne({ telephone: telephone.trim() });
     }
 
-    // Ne pas révéler si l'utilisateur existe ou non pour des raisons de sécurité
     if (!user) {
-      // Retourner un message de succès même si l'utilisateur n'existe pas
       return res.json({
         message: 'Si un compte existe avec cet email/téléphone, un nouveau mot de passe temporaire a été généré.'
       });
     }
 
-    // Générer un nouveau mot de passe temporaire
     const motDePasseTemporaire = generateTemporaryPassword();
 
-    // Mettre à jour le mot de passe et réinitialiser firstLogin
     user.motDePasse = motDePasseTemporaire;
     user.firstLogin = true;
     await user.save();
 
-    // Envoyer le nouveau mot de passe par email
     try {
       const { sendPasswordResetEmail } = require('../utils/emailUtils');
       const emailResult = await sendPasswordResetEmail(
@@ -411,8 +395,7 @@ const forgotPassword = async (req, res) => {
         motDePasseTemporaire,
         `${user.prenom} ${user.nom}`
       );
-      
-      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+
       if (!emailResult.success || emailResult.mode === 'simulation') {
         const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
         await sendWhatsAppCredentials(
@@ -423,7 +406,6 @@ const forgotPassword = async (req, res) => {
       }
     } catch (e) {
       console.error('Erreur lors de l\'envoi du mot de passe:', e);
-      // En cas d'erreur, essayer WhatsApp en fallback
       try {
         const { sendWhatsAppCredentials } = require('../utils/whatsappUtils');
         await sendWhatsAppCredentials(
@@ -436,11 +418,8 @@ const forgotPassword = async (req, res) => {
       }
     }
 
-    // En production, ne pas retourner le mot de passe dans la réponse
-    // Pour le développement, on le retourne pour faciliter les tests
     res.json({
       message: 'Un nouveau mot de passe temporaire a été généré et envoyé',
-      // En production, commenter la ligne suivante :
       ...(process.env.NODE_ENV === 'development' && { temporaryPassword: motDePasseTemporaire })
     });
   } catch (error) {
@@ -449,7 +428,6 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Authentification Google Sign-In
 const googleAuth = async (req, res) => {
   try {
     const { idToken, telephone, nom, prenom } = req.body;
@@ -460,7 +438,6 @@ const googleAuth = async (req, res) => {
 
     console.log('🔐 [GOOGLE AUTH] Tentative d\'authentification Google');
 
-    // Vérifier le token Google
     let ticket;
     try {
       ticket = await googleClient.verifyIdToken({
@@ -485,7 +462,6 @@ const googleAuth = async (req, res) => {
 
     console.log('✅ [GOOGLE AUTH] Token vérifié pour:', email);
 
-    // Chercher l'utilisateur par googleId ou email
     let user = await User.findOne({
       $or: [
         { googleId: googleId },
@@ -493,30 +469,23 @@ const googleAuth = async (req, res) => {
       ]
     });
 
-    // Si l'utilisateur existe
     if (user) {
-      // Si l'utilisateur n'a pas encore de googleId, le lier
       if (!user.googleId) {
         user.googleId = googleId;
         user.authMethod = 'google';
-        // Si l'utilisateur avait un mot de passe, on peut le garder ou le supprimer
-        // Pour simplifier, on le garde mais il ne sera plus utilisé
         await user.save();
       }
 
-      // Vérifier que c'est bien le même compte Google
       if (user.googleId !== googleId) {
         return res.status(400).json({ 
           message: 'Cet email est associé à un autre compte Google' 
         });
       }
 
-      // Générer les tokens
       const { accessToken, refreshToken } = generateTokens(user._id);
       user.refreshToken = refreshToken;
       await user.save();
 
-      // Récupérer l'abonnement si c'est un propriétaire
       let abonnement = null;
       if (FREE_MODE) {
         const now = new Date();
@@ -549,29 +518,24 @@ const googleAuth = async (req, res) => {
       });
     }
 
-    // Si l'utilisateur n'existe pas - Nouvelle inscription
-    // Vérifier si c'est un résident (doit être créé par un propriétaire)
     const existingResident = await User.findOne({ 
       email: email, 
       role: 'resident' 
     });
 
     if (existingResident) {
-      // Si c'est un résident existant, lier son compte Google et le connecter
       if (!existingResident.googleId) {
         existingResident.googleId = googleId;
         existingResident.authMethod = 'google';
         await existingResident.save();
       }
 
-      // Vérifier que c'est bien le même compte Google
       if (existingResident.googleId !== googleId) {
         return res.status(400).json({ 
           message: 'Cet email est associé à un autre compte Google' 
         });
       }
 
-      // Générer les tokens pour le résident
       const { accessToken, refreshToken } = generateTokens(existingResident._id);
       existingResident.refreshToken = refreshToken;
       await existingResident.save();
@@ -588,9 +552,7 @@ const googleAuth = async (req, res) => {
       });
     }
 
-    // Pour les nouveaux propriétaires, vérifier qu'on a les informations nécessaires
     if (!telephone) {
-      // Utiliser les données Google si disponibles
       const finalNom = nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
       const finalPrenom = prenom || googleGivenName || googleName.split(' ').slice(0, -1).join(' ') || googleName || '';
 
@@ -607,7 +569,6 @@ const googleAuth = async (req, res) => {
       });
     }
 
-    // Créer le nouveau compte propriétaire
     const finalNom = nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
     const finalPrenom = prenom || googleGivenName || googleName.split(' ').slice(0, -1).join(' ') || googleName || '';
 
@@ -625,13 +586,11 @@ const googleAuth = async (req, res) => {
       });
     }
 
-    // Vérifier si l'email existe déjà (double vérification)
     const emailExists = await User.findOne({ email: email });
     if (emailExists) {
       return res.status(400).json({ message: 'Cet email est déjà utilisé' });
     }
 
-    // Créer l'utilisateur
     user = new User({
       nom: finalNom,
       prenom: finalPrenom,
@@ -640,13 +599,11 @@ const googleAuth = async (req, res) => {
       googleId: googleId,
       authMethod: 'google',
       role: 'proprietaire',
-      // Pas de mot de passe pour les utilisateurs Google
       motDePasse: null
     });
 
     await user.save();
 
-    // Générer les tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshToken = refreshToken;
     await user.save();
@@ -670,19 +627,16 @@ const googleAuth = async (req, res) => {
   }
 };
 
-// Supprimer son propre compte
 const deleteMyAccount = async (req, res) => {
   try {
     const { motDePasse } = req.body;
     const userId = req.user._id;
 
-    // Recharger l'utilisateur avec le mot de passe
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Ne pas permettre la suppression d'un admin si c'est le dernier
     if (user.role === 'admin') {
       const adminCount = await User.countDocuments({ role: 'admin' });
       if (adminCount <= 1) {
@@ -690,7 +644,6 @@ const deleteMyAccount = async (req, res) => {
       }
     }
 
-    // Vérifier le mot de passe (sauf pour les utilisateurs Google qui n'ont pas de mot de passe)
     if (user.authMethod === 'email' && user.motDePasse) {
       if (!motDePasse) {
         return res.status(400).json({ message: 'Mot de passe requis pour supprimer votre compte' });
@@ -703,7 +656,6 @@ const deleteMyAccount = async (req, res) => {
 
     console.log(`🗑️ [DELETE MY ACCOUNT] Début de la suppression du compte ${userId} (${user.role})`);
 
-    // Réutiliser la logique de suppression en cascade de adminController
     const Maison = require('../models/Maison');
     const Consommation = require('../models/Consommation');
     const Facture = require('../models/Facture');
@@ -712,7 +664,6 @@ const deleteMyAccount = async (req, res) => {
     const Log = require('../models/Log');
     const Abonnement = require('../models/Abonnement');
 
-    // 1. Si l'utilisateur est un propriétaire, gérer ses maisons et abonnements
     if (user.role === 'proprietaire') {
       const maisons = await Maison.find({ proprietaireId: userId });
       
@@ -726,8 +677,7 @@ const deleteMyAccount = async (req, res) => {
             tousResidentsIds.push(...maison.listeResidents.map(r => r.toString()));
           }
         }
-        
-        // Supprimer toutes les consommations
+
         if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
           const consommationQuery = { $or: [] };
           if (toutesMaisonsIds.length > 0) {
@@ -741,7 +691,6 @@ const deleteMyAccount = async (req, res) => {
           }
         }
 
-        // Supprimer toutes les factures
         if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
           const factureQuery = { $or: [] };
           if (toutesMaisonsIds.length > 0) {
@@ -755,20 +704,16 @@ const deleteMyAccount = async (req, res) => {
           }
         }
 
-        // Supprimer tous les résidents
         if (tousResidentsIds.length > 0) {
           await User.deleteMany({ _id: { $in: tousResidentsIds } });
         }
 
-        // Supprimer toutes les maisons
         await Maison.deleteMany({ proprietaireId: userId });
       }
 
-      // Supprimer les abonnements
       await Abonnement.deleteMany({ proprietaireId: userId });
     }
 
-    // 2. Si l'utilisateur est un résident
     if (user.role === 'resident') {
       await Maison.updateMany(
         { listeResidents: userId },
@@ -778,7 +723,6 @@ const deleteMyAccount = async (req, res) => {
       await Facture.deleteMany({ residentId: userId });
     }
 
-    // 3. Supprimer les messages
     await Message.deleteMany({
       $or: [
         { expediteur: userId },
@@ -786,19 +730,15 @@ const deleteMyAccount = async (req, res) => {
       ]
     });
 
-    // 4. Supprimer les notifications
     await Notification.deleteMany({ destinataire: userId });
 
-    // 5. Supprimer les logs
     await Log.deleteMany({ user: userId });
 
-    // 6. Mettre à jour les références idProprietaire
     await User.updateMany(
       { idProprietaire: userId },
       { $set: { idProprietaire: null } }
     );
 
-    // 7. Supprimer l'utilisateur
     await User.findByIdAndDelete(userId);
 
     console.log(`✅ [DELETE MY ACCOUNT] Compte ${userId} supprimé avec succès`);
@@ -820,6 +760,7 @@ module.exports = {
   changePassword,
   getCurrentUser,
   setDeviceToken,
+  setHomeLocation,
   forgotPassword,
   deleteMyAccount
 };

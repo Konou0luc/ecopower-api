@@ -16,15 +16,13 @@ async function createAdmin() {
     await mongoose.connect(mongoUri);
     console.log('✅ Connecté à MongoDB\n');
     
-    // Vérifier si un admin existe déjà
     const existingAdmin = await User.findOne({ role: 'admin' });
     if (existingAdmin) {
       console.log('⚠️  Un administrateur existe déjà:', existingAdmin.email);
       console.log('   Si vous voulez le remplacer, supprimez-le d\'abord ou modifiez ce script.');
       process.exit(0);
     }
-    
-    // Informations de l'admin (modifiez ces valeurs selon vos besoins)
+
     const adminData = {
       nom: 'Admin',
       prenom: 'System',
@@ -40,7 +38,6 @@ async function createAdmin() {
     console.log(`   Téléphone: ${adminData.telephone}`);
     console.log(`   Mot de passe: ${adminData.motDePasse}\n`);
     
-    // Créer l'admin
     const admin = new User(adminData);
     await admin.save();
     

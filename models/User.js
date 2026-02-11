@@ -28,19 +28,19 @@ const userSchema = new mongoose.Schema(
     },
     motDePasse: {
       type: String,
-      required: false, // Rendre optionnel pour permettre Google Sign-In
+      required: false,
       default: null,
     },
     googleId: {
       type: String,
       unique: true,
-      sparse: true, // Permet plusieurs null - l'index ignore les documents sans ce champ
-      default: undefined, // Ne pas définir par défaut pour éviter les conflits d'index
+      sparse: true,
+      default: undefined,
     },
     authMethod: {
       type: String,
-      enum: ['google', 'email'],
-      default: 'email',
+      enum: ["google", "email"],
+      default: "email",
     },
     role: {
       type: String,
@@ -74,34 +74,55 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    homeLatitude: {
+      type: Number,
+      default: null,
+    },
+    homeLongitude: {
+      type: Number,
+      default: null 
+    },
+    homeCity: { 
+      type: String, 
+      default: null 
+    },
+    homeCountry: {
+      type: String, 
+      default: null 
+    },
+    homeLocationSource: {
+      type: String,
+      enum: ["gps", "manual"],
+      default: null,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Validation personnalisée : au moins googleId ou motDePasse doit être présent
-// Exception : les résidents avec authMethod: 'google' peuvent être créés sans googleId
-// (ils seront créés par le propriétaire avant leur première connexion Google)
 userSchema.pre("validate", function (next) {
-  // Si c'est un résident avec authMethod: 'google', permettre la création sans googleId
-  // Le googleId sera ajouté lors de la première connexion Google
-  if (this.role === 'resident' && this.authMethod === 'google' && !this.googleId && !this.motDePasse) {
-    return next(); // Autoriser la création
+
+  if (
+    this.role === "resident" &&
+    this.authMethod === "google" &&
+    !this.googleId &&
+    !this.motDePasse
+  ) {
+    return next();
   }
-  
-  // Pour les autres cas, au moins googleId ou motDePasse doit être présent
+
   if (!this.googleId && !this.motDePasse) {
-    const error = new Error('Au moins une méthode d\'authentification est requise (Google ou mot de passe)');
+    const error = new Error(
+      "Au moins une méthode d'authentification est requise (Google ou mot de passe)",
+    );
     return next(error);
   }
   next();
 });
 
-// Hash du mot de passe avant sauvegarde (seulement si motDePasse est fourni)
 userSchema.pre("save", async function (next) {
-  // Si c'est une authentification Google, pas besoin de hasher le mot de passe
-  if (this.authMethod === 'google' || !this.motDePasse) {
+  if (this.authMethod === "google" || !this.motDePasse) {
     return next();
   }
 
@@ -116,21 +137,17 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Méthode pour comparer les mots de passe
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  // Si l'utilisateur utilise Google Sign-In, pas de comparaison de mot de passe
-  if (this.authMethod === 'google' || !this.motDePasse) {
+  if (this.authMethod === "google" || !this.motDePasse) {
     return false;
   }
   return bcrypt.compare(candidatePassword, this.motDePasse);
 };
 
-// Méthode pour obtenir le nom complet
 userSchema.virtual("nomComplet").get(function () {
   return `${this.prenom} ${this.nom}`;
 });
 
-// Configuration pour inclure les virtuals dans les réponses JSON
 userSchema.set("toJSON", {
   virtuals: true,
   transform: function (doc, ret) {
@@ -140,7 +157,6 @@ userSchema.set("toJSON", {
   },
 });
 
-// Ajouter le plugin de pagination
 userSchema.plugin(mongoosePaginate);
 
 module.exports = mongoose.model("User", userSchema);
