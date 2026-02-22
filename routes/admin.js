@@ -46,6 +46,10 @@ router.get('/logs', adminController.getLogs);
 router.get('/system/status', systemController.getSystemStatus);
 router.get('/system/info', systemController.getSystemInfo);
 
+// Paramètres de contact (email, téléphone, site web) - modifiables via l'admin
+router.get('/app-info', adminController.getAppInfo);
+router.put('/app-info', adminController.updateAppInfo);
+
 // Test des notifications FCM
 router.post('/test/notification', adminController.testNotification);
 

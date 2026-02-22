@@ -7,6 +7,7 @@ const Abonnement = require('../models/Abonnement');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const Log = require('../models/Log');
+const AppSettings = require('../models/AppSettings');
 
 // Dashboard - Statistiques générales
 const getDashboardStats = async (req, res) => {
@@ -1167,6 +1168,61 @@ const broadcastNotification = async (req, res) => {
   }
 };
 
+// Paramètres de contact (email, téléphone, site web) - modifiables via l'admin
+const getAppInfo = async (req, res) => {
+  try {
+    const settings = await AppSettings.findOne({ key: 'contact' });
+    const data = settings
+      ? {
+          email: settings.email || '',
+          phone: settings.phone || '',
+          website: settings.website || '',
+          description: settings.description || '',
+        }
+      : { email: '', phone: '', website: '', description: '' };
+    res.json(data);
+  } catch (error) {
+    console.error('Erreur getAppInfo:', error);
+    res.status(500).json({
+      message: 'Erreur lors de la récupération des paramètres',
+      error: error.message,
+    });
+  }
+};
+
+const updateAppInfo = async (req, res) => {
+  try {
+    const { email, phone, website, description } = req.body;
+    const settings = await AppSettings.findOneAndUpdate(
+      { key: 'contact' },
+      {
+        $set: {
+          email: email ?? '',
+          phone: phone ?? '',
+          website: website ?? '',
+          description: description ?? '',
+        },
+      },
+      { new: true, upsert: true }
+    );
+    res.json({
+      message: 'Paramètres de contact mis à jour',
+      data: {
+        email: settings.email,
+        phone: settings.phone,
+        website: settings.website,
+        description: settings.description,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur updateAppInfo:', error);
+    res.status(500).json({
+      message: 'Erreur lors de la mise à jour des paramètres',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllUsers,
@@ -1183,5 +1239,7 @@ module.exports = {
   getNotifications,
   getLogs,
   testNotification,
-  broadcastNotification
+  broadcastNotification,
+  getAppInfo,
+  updateAppInfo,
 };

@@ -93,6 +93,10 @@ app.get('/config', (req, res) => {
   res.json({ freeMode: process.env.FREE_MODE === 'true' });
 });
 
+// Infos de contact dynamiques (À propos - email, téléphone, site web)
+const appInfoController = require('./controllers/appInfoController');
+app.get('/app-info', appInfoController.getAppInfo);
+
 app.get('/', (req, res) => {
   res.json({ message: 'API Ecopower - Gestion de consommation électrique' });
 });
