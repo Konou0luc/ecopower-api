@@ -1,7 +1,7 @@
 const Maison = require('../models/Maison');
 const User = require('../models/User');
 
-// GET /maisons/:id - détaillée avec residents
+
 const getMaisonById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -18,23 +18,25 @@ const getMaisonById = async (req, res) => {
   }
 };
 
-// Créer une maison
+
 const createMaison = async (req, res) => {
   try {
-    const { nomMaison, adresse, description, tarifKwh } = req.body;
+    const { nomMaison, adresse, description, tarifKwh, nbResidentsMax } = req.body;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent créer des maisons' });
     }
 
-    // Créer la maison
+    
     const maison = new Maison({
       nomMaison,
       proprietaireId: req.user._id,
       adresse,
       description,
-      tarifKwh: tarifKwh !== undefined ? Number(tarifKwh) : undefined
+      tarifKwh: tarifKwh !== undefined ? Number(tarifKwh) : undefined,
+      nbResidentsMax:
+        nbResidentsMax !== undefined ? Number(nbResidentsMax) : undefined
     });
 
     await maison.save();
@@ -49,18 +51,18 @@ const createMaison = async (req, res) => {
   }
 };
 
-// Obtenir les maisons d'un propriétaire
+
 const getMaisons = async (req, res) => {
   try {
     let maisons;
 
     if (req.user.role === 'proprietaire') {
-      // Le propriétaire voit toutes ses maisons
+      
       maisons = await Maison.find({ proprietaireId: req.user._id })
         .populate('listeResidents', 'nom prenom email telephone')
         .sort({ createdAt: -1 });
     } else {
-      // Le résident voit les maisons où il habite
+      
       maisons = await Maison.find({ listeResidents: req.user._id })
         .populate('proprietaireId', 'nom prenom email')
         .populate('listeResidents', 'nom prenom email telephone')
@@ -77,7 +79,7 @@ const getMaisons = async (req, res) => {
   }
 };
 
-// Obtenir une maison spécifique
+
 const getMaison = async (req, res) => {
   try {
     const { id } = req.params;
@@ -107,18 +109,18 @@ const getMaison = async (req, res) => {
   }
 };
 
-// Mettre à jour une maison
+
 const updateMaison = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nomMaison, adresse, description } = req.body;
+    const { nomMaison, adresse, description, tarifKwh, nbResidentsMax } = req.body;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent modifier des maisons' });
     }
 
-    // Trouver la maison
+    
     const maison = await Maison.findOne({
       _id: id,
       proprietaireId: req.user._id
@@ -128,10 +130,22 @@ const updateMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Mettre à jour les champs
+    
     if (nomMaison) maison.nomMaison = nomMaison;
     if (adresse) maison.adresse = adresse;
     if (description !== undefined) maison.description = description;
+    if (tarifKwh !== undefined) {
+      if (Number.isNaN(Number(tarifKwh)) || Number(tarifKwh) < 0) {
+        return res.status(400).json({ message: 'tarifKwh invalide' });
+      }
+      maison.tarifKwh = Number(tarifKwh);
+    }
+    if (nbResidentsMax !== undefined) {
+      if (Number.isNaN(Number(nbResidentsMax)) || Number(nbResidentsMax) < 1) {
+        return res.status(400).json({ message: 'nbResidentsMax invalide' });
+      }
+      maison.nbResidentsMax = Number(nbResidentsMax);
+    }
 
     await maison.save();
 
@@ -145,17 +159,72 @@ const updateMaison = async (req, res) => {
   }
 };
 
-// Supprimer une maison
+
+const updateMaisonConfiguration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tarifKwh, nbResidentsMax } = req.body;
+
+    if (req.user.role !== 'proprietaire') {
+      return res.status(403).json({ message: 'Seuls les propriétaires peuvent modifier la configuration' });
+    }
+
+    if (tarifKwh === undefined && nbResidentsMax === undefined) {
+      return res.status(400).json({
+        message: 'Veuillez fournir au moins tarifKwh ou nbResidentsMax'
+      });
+    }
+
+    if (tarifKwh !== undefined && (Number.isNaN(Number(tarifKwh)) || Number(tarifKwh) < 0)) {
+      return res.status(400).json({ message: 'tarifKwh invalide' });
+    }
+
+    if (
+      nbResidentsMax !== undefined &&
+      (Number.isNaN(Number(nbResidentsMax)) || Number(nbResidentsMax) < 1)
+    ) {
+      return res.status(400).json({ message: 'nbResidentsMax invalide' });
+    }
+
+    const maison = await Maison.findOne({ _id: id, proprietaireId: req.user._id });
+    if (!maison) {
+      return res.status(404).json({ message: 'Maison non trouvée' });
+    }
+
+    if (tarifKwh !== undefined) {
+      maison.tarifKwh = Number(tarifKwh);
+    }
+    if (nbResidentsMax !== undefined) {
+      maison.nbResidentsMax = Number(nbResidentsMax);
+    }
+
+    await maison.save();
+
+    return res.json({
+      message: 'Configuration de la maison mise à jour avec succès',
+      maison: {
+        _id: maison._id,
+        tarifKwh: maison.tarifKwh,
+        nbResidentsMax: maison.nbResidentsMax
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de la configuration:', error);
+    return res.status(500).json({ message: 'Erreur lors de la mise à jour de la configuration' });
+  }
+};
+
+
 const deleteMaison = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent supprimer des maisons' });
     }
 
-    // Trouver la maison
+    
     const maison = await Maison.findOne({
       _id: id,
       proprietaireId: req.user._id
@@ -165,7 +234,7 @@ const deleteMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Vérifier qu'il n'y a pas de résidents
+    
     if (maison.listeResidents.length > 0) {
       return res.status(400).json({ 
         message: 'Impossible de supprimer une maison qui a des résidents' 
@@ -181,7 +250,7 @@ const deleteMaison = async (req, res) => {
   }
 };
 
-// Mettre à jour le tarif d'une maison (propriétaire uniquement)
+
 const updateMaisonTarif = async (req, res) => {
   try {
     const { id } = req.params;
@@ -210,17 +279,17 @@ const updateMaisonTarif = async (req, res) => {
   }
 };
 
-// Ajouter un résident à une maison
+
 const addResidentToMaison = async (req, res) => {
   try {
     const { maisonId, residentId } = req.body;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent ajouter des résidents' });
     }
 
-    // Vérifier que la maison appartient au propriétaire
+    
     const maison = await Maison.findOne({
       _id: maisonId,
       proprietaireId: req.user._id
@@ -230,7 +299,7 @@ const addResidentToMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Vérifier que le résident appartient au propriétaire
+    
     const resident = await User.findOne({
       _id: residentId,
       idProprietaire: req.user._id,
@@ -241,7 +310,17 @@ const addResidentToMaison = async (req, res) => {
       return res.status(404).json({ message: 'Résident non trouvé' });
     }
 
-    // Ajouter le résident à la maison
+    if (
+      typeof maison.nbResidentsMax === 'number' &&
+      maison.nbResidentsMax > 0 &&
+      maison.listeResidents.length >= maison.nbResidentsMax
+    ) {
+      return res.status(400).json({
+        message: `Nombre maximal de résidents atteint pour cette maison (${maison.nbResidentsMax})`
+      });
+    }
+
+    
     await maison.ajouterResident(residentId);
 
     res.json({
@@ -254,17 +333,17 @@ const addResidentToMaison = async (req, res) => {
   }
 };
 
-// Retirer un résident d'une maison
+
 const removeResidentFromMaison = async (req, res) => {
   try {
     const { maisonId, residentId } = req.body;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent retirer des résidents' });
     }
 
-    // Vérifier que la maison appartient au propriétaire
+    
     const maison = await Maison.findOne({
       _id: maisonId,
       proprietaireId: req.user._id
@@ -274,7 +353,7 @@ const removeResidentFromMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Retirer le résident de la maison
+    
     await maison.retirerResident(residentId);
 
     res.json({
@@ -292,6 +371,7 @@ module.exports = {
   getMaisons,
   getMaison,
   updateMaison,
+  updateMaisonConfiguration,
   deleteMaison,
   addResidentToMaison,
   removeResidentFromMaison,

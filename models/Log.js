@@ -39,7 +39,7 @@ const logSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index pour améliorer les performances
+
 logSchema.index({ level: 1, createdAt: -1 });
 logSchema.index({ module: 1, createdAt: -1 });
 logSchema.index({ user: 1, createdAt: -1 });

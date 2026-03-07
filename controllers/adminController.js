@@ -9,19 +9,19 @@ const Notification = require('../models/Notification');
 const Log = require('../models/Log');
 const AppSettings = require('../models/AppSettings');
 
-// Dashboard - Statistiques générales
+
 const getDashboardStats = async (req, res) => {
   try {
-    // Compter les utilisateurs par rôle
+    
     const totalUsers = await User.countDocuments();
     const totalProprietaires = await User.countDocuments({ role: 'proprietaire' });
     const totalResidents = await User.countDocuments({ role: 'resident' });
     const totalAdmins = await User.countDocuments({ role: 'admin' });
 
-    // Compter les maisons
+    
     const totalMaisons = await Maison.countDocuments();
 
-    // Statistiques des consommations
+    
     const totalConsommations = await Consommation.countDocuments();
     const totalKwh = await Consommation.aggregate([
       { $group: { _id: null, total: { $sum: '$kwh' } } }
@@ -30,19 +30,19 @@ const getDashboardStats = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$montant' } } }
     ]);
 
-    // Statistiques des factures
+    
     const totalFactures = await Facture.countDocuments();
     const facturesPayees = await Facture.countDocuments({ statut: 'payée' });
     const facturesEnRetard = await Facture.countDocuments({ statut: 'en retard' });
     const facturesEnAttente = await Facture.countDocuments({ statut: 'en attente' });
 
-    // Revenus totaux
+    
     const revenusTotaux = await Facture.aggregate([
       { $match: { statut: 'payée' } },
       { $group: { _id: null, total: { $sum: '$montant' } } }
     ]);
 
-    // Consommations des 6 derniers mois
+    
     const sixMoisAgo = new Date();
     sixMoisAgo.setMonth(sixMoisAgo.getMonth() - 6);
     
@@ -62,7 +62,7 @@ const getDashboardStats = async (req, res) => {
       { $sort: { '_id.annee': 1, '_id.mois': 1 } }
     ]);
 
-    // Factures des 6 derniers mois
+    
     const facturesRecentes = await Facture.aggregate([
       { $match: { dateEmission: { $gte: sixMoisAgo } } },
       {
@@ -81,7 +81,7 @@ const getDashboardStats = async (req, res) => {
       { $sort: { '_id.annee': 1, '_id.mois': 1 } }
     ]);
 
-    // Top 5 des maisons les plus consommatrices
+    
     const topMaisons = await Consommation.aggregate([
       {
         $group: {
@@ -138,13 +138,13 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
-// Obtenir tous les utilisateurs (admin)
+
 const getAllUsers = async (req, res) => {
   try {
     const { page = 1, limit = 10, role, search } = req.query;
     const skip = (page - 1) * limit;
 
-    // Construire la requête
+    
     const query = {};
     if (role) query.role = role;
     if (search) {
@@ -178,17 +178,17 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// Obtenir un utilisateur par ID (admin)
+
 const getUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que l'ID est valide
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'ID utilisateur invalide' });
     }
 
-    // Récupérer l'utilisateur avec ses relations
+    
     const user = await User.findById(id)
       .select('-motDePasse -refreshToken')
       .populate('maisonId', 'nomMaison adresse')
@@ -199,11 +199,11 @@ const getUser = async (req, res) => {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Compter les statistiques liées à l'utilisateur
+    
     let stats = {};
     
     if (user.role === 'proprietaire') {
-      // Statistiques pour un propriétaire
+      
       const maisonsIds = await Maison.find({ proprietaireId: id }).distinct('_id');
       const [maisonsCount, facturesCount, consommationsCount] = await Promise.all([
         Maison.countDocuments({ proprietaireId: id }),
@@ -217,7 +217,7 @@ const getUser = async (req, res) => {
         consommations: consommationsCount
       };
     } else if (user.role === 'resident') {
-      // Statistiques pour un résident
+      
       const [consommationsCount, facturesCount] = await Promise.all([
         Consommation.countDocuments({ residentId: id }),
         Facture.countDocuments({ residentId: id })
@@ -241,13 +241,13 @@ const getUser = async (req, res) => {
   }
 };
 
-// Obtenir toutes les maisons (admin)
+
 const getAllMaisons = async (req, res) => {
   try {
     const { page = 1, limit = 10, search } = req.query;
     const skip = (page - 1) * limit;
 
-    // Construire la requête
+    
     const query = {};
     if (search) {
       query.$or = [
@@ -280,13 +280,13 @@ const getAllMaisons = async (req, res) => {
   }
 };
 
-// Obtenir toutes les consommations (admin)
+
 const getAllConsommations = async (req, res) => {
   try {
     const { page = 1, limit = 10, annee, mois, maisonId } = req.query;
     const skip = (page - 1) * limit;
 
-    // Construire la requête
+    
     const query = {};
     if (annee) query.annee = parseInt(annee);
     if (mois) query.mois = parseInt(mois);
@@ -301,7 +301,7 @@ const getAllConsommations = async (req, res) => {
 
     const total = await Consommation.countDocuments(query);
 
-    // Statistiques
+    
     const stats = await Consommation.aggregate([
       { $match: query },
       {
@@ -331,13 +331,13 @@ const getAllConsommations = async (req, res) => {
   }
 };
 
-// Obtenir toutes les factures (admin)
+
 const getAllFactures = async (req, res) => {
   try {
     const { page = 1, limit = 10, statut, annee, maisonId } = req.query;
     const skip = (page - 1) * limit;
 
-    // Construire la requête
+    
     const query = {};
     if (statut) query.statut = statut;
     if (maisonId) query.maisonId = maisonId;
@@ -358,7 +358,7 @@ const getAllFactures = async (req, res) => {
 
     const total = await Facture.countDocuments(query);
 
-    // Statistiques
+    
     const stats = await Facture.aggregate([
       { $match: query },
       {
@@ -401,13 +401,13 @@ const getAllFactures = async (req, res) => {
   }
 };
 
-// Obtenir tous les abonnements (admin)
+
 const getAllAbonnements = async (req, res) => {
   try {
     const { page = 1, limit = 10, statut } = req.query;
     const skip = (page - 1) * limit;
 
-    // Construire la requête
+    
     const query = {};
     if (statut) query.statut = statut;
 
@@ -434,17 +434,17 @@ const getAllAbonnements = async (req, res) => {
   }
 };
 
-// Supprimer un utilisateur (admin)
+
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que l'ID est valide
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'ID utilisateur invalide' });
     }
 
-    // Vérifier que l'utilisateur existe
+    
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -452,7 +452,7 @@ const deleteUser = async (req, res) => {
 
     console.log(`🗑️ [DELETE USER] Début de la suppression de l'utilisateur ${id} (${user.role})`);
 
-    // Ne pas permettre la suppression d'un admin si c'est le dernier
+    
     if (user.role === 'admin') {
       const adminCount = await User.countDocuments({ role: 'admin' });
       if (adminCount <= 1) {
@@ -460,18 +460,18 @@ const deleteUser = async (req, res) => {
       }
     }
 
-    // Suppression en cascade de toutes les données liées à l'utilisateur
+    
 
-    // 1. Si l'utilisateur est un propriétaire, gérer ses maisons et abonnements
+    
     if (user.role === 'proprietaire') {
       console.log(`🗑️ [DELETE USER] Suppression des maisons du propriétaire ${id}`);
       
-      // Récupérer toutes les maisons du propriétaire
+      
       const maisons = await Maison.find({ proprietaireId: id });
       console.log(`🗑️ [DELETE USER] ${maisons.length} maison(s) trouvée(s) pour le propriétaire ${id}`);
       
       if (maisons.length > 0) {
-        // Collecter tous les IDs de résidents de toutes les maisons
+        
         const tousResidentsIds = [];
         const toutesMaisonsIds = [];
         
@@ -482,7 +482,7 @@ const deleteUser = async (req, res) => {
           }
         }
         
-        // Supprimer toutes les consommations liées aux maisons et résidents
+        
         if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
           const consommationQuery = {
             $or: []
@@ -499,7 +499,7 @@ const deleteUser = async (req, res) => {
           }
         }
 
-        // Supprimer toutes les factures liées aux maisons et résidents
+        
         if (toutesMaisonsIds.length > 0 || tousResidentsIds.length > 0) {
           const factureQuery = {
             $or: []
@@ -516,58 +516,58 @@ const deleteUser = async (req, res) => {
           }
         }
 
-        // Supprimer tous les résidents de ces maisons
+        
         if (tousResidentsIds.length > 0) {
           const residentsDeleted = await User.deleteMany({ _id: { $in: tousResidentsIds } });
           console.log(`🗑️ [DELETE USER] ${residentsDeleted.deletedCount} résident(s) supprimé(s)`);
         }
 
-        // Supprimer toutes les maisons en une seule requête
+        
         const maisonsDeleted = await Maison.deleteMany({ proprietaireId: id });
         console.log(`🗑️ [DELETE USER] ${maisonsDeleted.deletedCount} maison(s) supprimée(s)`);
       }
 
-      // Supprimer les abonnements du propriétaire
+      
       const abonnementsDeleted = await Abonnement.deleteMany({ proprietaireId: id });
       console.log(`🗑️ [DELETE USER] ${abonnementsDeleted.deletedCount} abonnement(s) supprimé(s)`);
     }
 
-    // 2. Si l'utilisateur est un résident
+    
     if (user.role === 'resident') {
-      // Retirer le résident de la liste des résidents dans les maisons
+      
       await Maison.updateMany(
         { listeResidents: id },
         { $pull: { listeResidents: id } }
       );
 
-      // Supprimer les consommations du résident
+      
       await Consommation.deleteMany({ residentId: id });
 
-      // Supprimer les factures du résident
+      
       await Facture.deleteMany({ residentId: id });
     }
 
-    // 3. Supprimer les résidents qui ont cet utilisateur comme propriétaire
-    // (si l'utilisateur supprimé était un propriétaire mais pas géré ci-dessus)
+    
+    
     if (user.role === 'proprietaire') {
       const residents = await User.find({ idProprietaire: id, role: 'resident' });
       for (const resident of residents) {
-        // Retirer de la liste des résidents dans les maisons
+        
         if (resident.maisonId) {
           await Maison.updateOne(
             { _id: resident.maisonId },
             { $pull: { listeResidents: resident._id } }
           );
         }
-        // Supprimer les consommations et factures du résident
+        
         await Consommation.deleteMany({ residentId: resident._id });
         await Facture.deleteMany({ residentId: resident._id });
-        // Supprimer le résident
+        
         await User.findByIdAndDelete(resident._id);
       }
     }
 
-    // 4. Supprimer les messages (expéditeur ou destinataire)
+    
     await Message.deleteMany({
       $or: [
         { expediteur: id },
@@ -575,19 +575,19 @@ const deleteUser = async (req, res) => {
       ]
     });
 
-    // 5. Supprimer les notifications (destinataire)
+    
     await Notification.deleteMany({ destinataire: id });
 
-    // 6. Supprimer les logs liés à l'utilisateur
+    
     await Log.deleteMany({ user: id });
 
-    // 7. Mettre à jour les références idProprietaire dans les autres utilisateurs
+    
     await User.updateMany(
       { idProprietaire: id },
       { $set: { idProprietaire: null } }
     );
 
-    // 8. Finalement, supprimer l'utilisateur lui-même
+    
     await User.findByIdAndDelete(id);
 
     res.json({ message: 'Utilisateur et toutes ses données associées supprimés avec succès' });
@@ -597,18 +597,18 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Supprimer une maison (admin)
+
 const deleteMaison = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que la maison existe
+    
     const maison = await Maison.findById(id);
     if (!maison) {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Supprimer les consommations et factures liées
+    
     await Consommation.deleteMany({ maisonId: id });
     await Facture.deleteMany({ maisonId: id });
 
@@ -621,7 +621,7 @@ const deleteMaison = async (req, res) => {
   }
 };
 
-// Fonction pour obtenir tous les résidents avec pagination et filtres
+
 const getResidents = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, statut } = req.query;
@@ -639,10 +639,10 @@ const getResidents = async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { createdAt: -1 },
-      select: '-motDePasse -refreshToken', // Exclure les champs sensibles
+      select: '-motDePasse -refreshToken', 
     };
 
-    // Pagination manuelle en attendant le déploiement
+    
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const residents = await User.find(query)
       .select('-motDePasse -refreshToken')
@@ -652,15 +652,15 @@ const getResidents = async (req, res) => {
     
     const total = await User.countDocuments(query);
 
-    // Enrichir avec les données des maisons et consommations
+    
     const enrichedResidents = await Promise.all(
       residents.map(async (resident) => {
-        // Trouver la maison du résident
+        
         const maison = await Maison.findOne({ 
           listeResidents: resident._id 
         }).select('nomMaison adresse');
 
-        // Calculer les statistiques
+        
         const consommations = await Consommation.find({ 
           residentId: resident._id 
         });
@@ -697,18 +697,18 @@ const getResidents = async (req, res) => {
   }
 };
 
-// Fonction pour supprimer un résident
+
 const deleteResident = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que le résident existe
+    
     const resident = await User.findById(id);
     if (!resident) {
       return res.status(404).json({ message: 'Résident non trouvé' });
     }
 
-    // Retirer le résident de la maison associée
+    
     if (resident.maisonId) {
       await Maison.updateOne(
         { _id: resident.maisonId },
@@ -716,14 +716,14 @@ const deleteResident = async (req, res) => {
       );
     }
 
-    // Supprimer toutes les données associées au résident
-    // Supprimer les consommations du résident
+    
+    
     await Consommation.deleteMany({ residentId: resident._id });
 
-    // Supprimer les factures du résident
+    
     await Facture.deleteMany({ residentId: resident._id });
 
-    // Supprimer les messages (expéditeur ou destinataire)
+    
     await Message.deleteMany({
       $or: [
         { expediteur: resident._id },
@@ -731,13 +731,13 @@ const deleteResident = async (req, res) => {
       ]
     });
 
-    // Supprimer les notifications (destinataire)
+    
     await Notification.deleteMany({ destinataire: resident._id });
 
-    // Supprimer les logs liés au résident
+    
     await Log.deleteMany({ user: resident._id });
 
-    // Supprimer le résident
+    
     await User.findByIdAndDelete(resident._id);
 
     res.json({ message: 'Résident et toutes ses données associées supprimés avec succès' });
@@ -747,7 +747,7 @@ const deleteResident = async (req, res) => {
   }
 };
 
-// Messages
+
 const getMessages = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, type, status } = req.query;
@@ -789,7 +789,7 @@ const getMessages = async (req, res) => {
   }
 };
 
-// Notifications
+
 const getNotifications = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, type, status } = req.query;
@@ -830,7 +830,7 @@ const getNotifications = async (req, res) => {
   }
 };
 
-// Logs
+
 const getLogs = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, level, dateFrom, dateTo } = req.query;
@@ -874,12 +874,12 @@ const getLogs = async (req, res) => {
   }
 };
 
-// Tester l'envoi d'une notification FCM à un utilisateur
+
 const testNotification = async (req, res) => {
   try {
     const { userId, deviceToken, message } = req.body;
 
-    // Vérifier qu'au moins userId ou deviceToken est fourni
+    
     if (!userId && !deviceToken) {
       return res.status(400).json({ 
         message: 'userId ou deviceToken requis',
@@ -889,7 +889,7 @@ const testNotification = async (req, res) => {
       });
     }
 
-    // Vérifier qu'on n'utilise pas les deux en même temps
+    
     if (userId && deviceToken) {
       return res.status(400).json({ 
         message: 'Utilisez soit userId, soit deviceToken, pas les deux',
@@ -900,15 +900,15 @@ const testNotification = async (req, res) => {
     let user = null;
     let finalDeviceToken = null;
 
-    // Si un deviceToken est fourni directement, l'utiliser
+    
     if (deviceToken) {
       finalDeviceToken = deviceToken;
-      // Optionnellement, chercher l'utilisateur associé à ce token
+      
       user = await User.findOne({ deviceToken: deviceToken });
     } 
-    // Sinon, chercher l'utilisateur par userId
+    
     else if (userId) {
-      // Vérifier si c'est un ObjectId valide
+      
       if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
         return res.status(400).json({ 
           message: 'userId invalide. Format attendu: ObjectId MongoDB (24 caractères hexadécimaux)',
@@ -940,7 +940,7 @@ const testNotification = async (req, res) => {
     const notifications = require('../utils/notifications');
     const testMessage = message || `Notification de test - ${new Date().toLocaleString('fr-FR')}`;
     
-    // Utiliser la fonction d'envoi directe avec deviceToken
+    
     const admin = require('../config/firebase');
     const messagePayload = {
       notification: {
@@ -1005,7 +1005,7 @@ const testNotification = async (req, res) => {
   } catch (error) {
     console.error('Erreur lors du test de notification:', error);
     
-    // Gestion spécifique des erreurs Firebase
+    
     let errorMessage = error.message;
     if (error.code === 'messaging/invalid-registration-token' || 
         error.code === 'messaging/registration-token-not-registered') {
@@ -1022,7 +1022,7 @@ const testNotification = async (req, res) => {
   }
 };
 
-// Envoyer une notification à tous les utilisateurs
+
 const broadcastNotification = async (req, res) => {
   try {
     const { message, title, role } = req.body;
@@ -1037,17 +1037,17 @@ const broadcastNotification = async (req, res) => {
     const notificationTitle = title || 'Ecopower';
     const finalMessage = message.trim();
 
-    // Construire le filtre pour les utilisateurs
+    
     const filter = {
       deviceToken: { $exists: true, $ne: null, $nin: ['', null] }
     };
 
-    // Filtrer par rôle si spécifié
+    
     if (role && ['proprietaire', 'resident', 'admin'].includes(role)) {
       filter.role = role;
     }
 
-    // Récupérer tous les utilisateurs avec deviceToken
+    
     const users = await User.find(filter).select('_id nom prenom email role deviceToken');
     
     if (users.length === 0) {
@@ -1071,7 +1071,7 @@ const broadcastNotification = async (req, res) => {
       details: []
     };
 
-    // Envoyer les notifications en parallèle (par lots pour éviter la surcharge)
+    
     const batchSize = 10;
     for (let i = 0; i < users.length; i += batchSize) {
       const batch = users.slice(i, i + batchSize);
@@ -1135,7 +1135,7 @@ const broadcastNotification = async (req, res) => {
         })
       );
 
-      // Petite pause entre les lots pour éviter la surcharge
+      
       if (i + batchSize < users.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -1168,7 +1168,7 @@ const broadcastNotification = async (req, res) => {
   }
 };
 
-// Paramètres de contact (email, téléphone, site web) - modifiables via l'admin
+
 const getAppInfo = async (req, res) => {
   try {
     const settings = await AppSettings.findOne({ key: 'contact' });
@@ -1178,8 +1178,17 @@ const getAppInfo = async (req, res) => {
           phone: settings.phone || '',
           website: settings.website || '',
           description: settings.description || '',
+          guideRapideUrl: settings.guideRapideUrl || '',
+          privacyPolicyUrl: settings.privacyPolicyUrl || '',
         }
-      : { email: '', phone: '', website: '', description: '' };
+      : {
+          email: '',
+          phone: '',
+          website: '',
+          description: '',
+          guideRapideUrl: '',
+          privacyPolicyUrl: '',
+        };
     res.json(data);
   } catch (error) {
     console.error('Erreur getAppInfo:', error);
@@ -1192,7 +1201,7 @@ const getAppInfo = async (req, res) => {
 
 const updateAppInfo = async (req, res) => {
   try {
-    const { email, phone, website, description } = req.body;
+    const { email, phone, website, description, guideRapideUrl, privacyPolicyUrl } = req.body;
     const settings = await AppSettings.findOneAndUpdate(
       { key: 'contact' },
       {
@@ -1201,6 +1210,8 @@ const updateAppInfo = async (req, res) => {
           phone: phone ?? '',
           website: website ?? '',
           description: description ?? '',
+          guideRapideUrl: guideRapideUrl ?? '',
+          privacyPolicyUrl: privacyPolicyUrl ?? '',
         },
       },
       { new: true, upsert: true }
@@ -1212,6 +1223,8 @@ const updateAppInfo = async (req, res) => {
         phone: settings.phone,
         website: settings.website,
         description: settings.description,
+        guideRapideUrl: settings.guideRapideUrl,
+        privacyPolicyUrl: settings.privacyPolicyUrl,
       },
     });
   } catch (error) {

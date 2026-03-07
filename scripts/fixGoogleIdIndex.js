@@ -18,7 +18,7 @@ async function fixGoogleIdIndex() {
     const db = mongoose.connection.db;
     const collection = db.collection('users');
     
-    // Supprimer l'ancien index s'il existe
+    
     try {
       await collection.dropIndex('googleId_1');
       console.log('✅ Ancien index googleId_1 supprimé');
@@ -30,7 +30,7 @@ async function fixGoogleIdIndex() {
       }
     }
     
-    // Créer le nouvel index sparse
+    
     await collection.createIndex(
       { googleId: 1 },
       { 

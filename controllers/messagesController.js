@@ -3,13 +3,13 @@ const User = require('../models/User');
 const { uploadBufferToCloudinary, cloudinary } = require('../middlewares/upload');
 const notifications = require('../utils/notifications');
 
-// POST /messages/file -> créer un message avec fichier
+
 exports.createFileMessage = async (req, res) => {
   try {
     const { receiverId, contenu, maisonId } = req.body;
     const senderId = req.user._id;
 
-    // Validation des données
+    
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier fourni' });
     }
@@ -25,18 +25,18 @@ exports.createFileMessage = async (req, res) => {
       storage: 'memory'
     });
 
-    // Upload vers Cloudinary depuis le buffer (compat. serverless)
+    
     const cloudinaryResult = await uploadBufferToCloudinary(req.file);
 
-    // Pour les messages de groupe (receiverId null/vide), utiliser senderId comme destinataire par défaut
+    
     const destinataireId = receiverId && receiverId.trim() !== '' 
       ? receiverId 
       : senderId;
 
-    // Générer un sujet à partir du nom du fichier
+    
     const sujet = req.file.originalname;
 
-    // Déterminer le type réel du fichier pour les metadata (image, video, audio, file)
+    
     const fileType = req.file.mimetype.startsWith('image/') 
       ? 'image' 
       : req.file.mimetype.startsWith('video/') 
@@ -45,22 +45,22 @@ exports.createFileMessage = async (req, res) => {
           ? 'audio' 
           : 'file';
 
-    // Pour l'enum MongoDB, toujours utiliser 'chat' pour les messages de chat
+    
     const messageType = 'chat';
 
-    // Créer le message avec fichier en utilisant les champs du schéma MongoDB
+    
     const message = new Message({
       expediteur: senderId,
       destinataire: destinataireId,
       sujet: sujet,
       contenu: contenu || req.file.originalname,
-      type: messageType, // 'chat' pour l'enum
+      type: messageType, 
       statut: 'envoye',
       dateEnvoi: new Date(),
       metadata: {
         maisonId: maisonId,
-        receiverId: receiverId || null, // Garder pour compatibilité
-        fileType: fileType, // Type réel du fichier
+        receiverId: receiverId || null, 
+        fileType: fileType, 
         fileName: req.file.originalname,
         fileSize: req.file.size,
         fileMimeType: req.file.mimetype,
@@ -84,7 +84,7 @@ exports.createFileMessage = async (req, res) => {
       maisonId: maisonId,
     });
 
-    // Notification push uniquement si c'est le gérant qui envoie au résident
+    
     if (req.user.role === 'proprietaire' && receiverId && receiverId.trim() !== '') {
       try {
         const receiver = await User.findById(receiverId);
@@ -110,7 +110,7 @@ exports.createFileMessage = async (req, res) => {
   }
 };
 
-// Proxy/stream d'un fichier Cloudinary pour contourner les blocages publics
+
 exports.proxyFile = async (req, res) => {
   try {
     const { url } = req.query;
@@ -121,7 +121,7 @@ exports.proxyFile = async (req, res) => {
       return res.status(400).json({ message: 'URL non autorisée' });
     }
 
-    // Petites sécurités: forcer raw si pdf/doc
+    
     let target = url;
     if (target.includes('/image/upload/') && (target.endsWith('.pdf') || target.includes('application/pdf'))) {
       target = target.replace('/image/upload/', '/raw/upload/');
@@ -130,7 +130,7 @@ exports.proxyFile = async (req, res) => {
     const fetch = require('node-fetch');
     let response = await fetch(target);
 
-    // Si échec d'accès direct (401/403/404), tenter variantes + URL signées Cloudinary
+    
     if (![200].includes(response.status)) {
       try {
         const u = new URL(url);
@@ -138,8 +138,8 @@ exports.proxyFile = async (req, res) => {
         const resourceTypeInUrl = pathParts.includes('image') ? 'image' : (pathParts.includes('raw') ? 'raw' : null);
         const uploadIndex = pathParts.findIndex((p) => p === 'upload');
         if (uploadIndex !== -1 && uploadIndex + 1 < pathParts.length) {
-          let afterUpload = pathParts.slice(uploadIndex + 1); // e.g. ['v1760...', 'ecopower', 'messages', 'file.pdf']
-          // Retirer la version si présente (v123456789)
+          let afterUpload = pathParts.slice(uploadIndex + 1); 
+          
           if (afterUpload.length && /^v\d+$/.test(afterUpload[0])) {
             afterUpload = afterUpload.slice(1);
           }
@@ -152,7 +152,7 @@ exports.proxyFile = async (req, res) => {
             : publicWithExt;
 
           const isPdf = ((ext || '').toLowerCase() === 'pdf');
-          // 1) Essayer l'autre resource_type (toggle image/raw) sur l'URL directe
+          
           if (isPdf) {
             const toggled = url.includes('/image/upload/')
               ? url.replace('/image/upload/', '/raw/upload/')
@@ -164,11 +164,11 @@ exports.proxyFile = async (req, res) => {
           }
 
           if (!response.ok) {
-            // 2) Générer une URL signée via cloudinary.url (sign_url)
+            
             const primaryResource = isPdf ? 'raw' : (resourceTypeInUrl || 'image');
             const altResource = primaryResource === 'raw' ? 'image' : 'raw';
 
-            // Essai URL signée principale
+            
             const signedUrlPrimary = cloudinary.url(publicId, {
               resource_type: primaryResource,
               type: 'upload',
@@ -181,7 +181,7 @@ exports.proxyFile = async (req, res) => {
             if (r3.ok) {
               response = r3;
             } else {
-              // Essai URL signée alternative (toggle resource_type)
+              
               const signedUrlAlt = cloudinary.url(publicId, {
                 resource_type: altResource,
                 type: 'upload',
@@ -198,7 +198,7 @@ exports.proxyFile = async (req, res) => {
           }
         }
       } catch (e) {
-        // Ignorer, on tombera sur l'erreur initiale
+        
       }
     }
 
@@ -206,7 +206,7 @@ exports.proxyFile = async (req, res) => {
       return res.status(response.status).send(await response.text());
     }
 
-    // Propager content-type et dispo si dispo
+    
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
     res.setHeader('Content-Type', contentType);
@@ -221,13 +221,13 @@ exports.proxyFile = async (req, res) => {
   }
 };
 
-// POST /messages -> créer un message
+
 exports.createMessage = async (req, res) => {
   try {
     const { receiverId, contenu, maisonId } = req.body;
     const senderId = req.user._id;
 
-    // Validation des données
+    
     if (!contenu || contenu.trim().length === 0) {
       return res.status(400).json({ message: 'Le contenu du message est requis' });
     }
@@ -236,29 +236,29 @@ exports.createMessage = async (req, res) => {
       return res.status(400).json({ message: 'L\'ID de la maison est requis' });
     }
 
-    // Pour les messages de groupe (receiverId null/vide), utiliser senderId comme destinataire par défaut
-    // ou rendre destinataire optionnel. Ici, on utilise senderId comme fallback.
+    
+    
     const destinataireId = receiverId && receiverId.trim() !== '' 
       ? receiverId 
-      : senderId; // Pour messages de groupe, destinataire = expéditeur (tous les membres voient le message)
+      : senderId; 
 
-    // Générer un sujet à partir du contenu (premiers 50 caractères)
+    
     const sujet = contenu.trim().length > 50 
       ? contenu.trim().substring(0, 50) + '...' 
       : contenu.trim();
 
-    // Créer le message avec les champs du schéma MongoDB
+    
     const message = new Message({
       expediteur: senderId,
       destinataire: destinataireId,
       sujet: sujet,
       contenu: contenu.trim(),
-      type: 'chat', // Utiliser 'chat' au lieu de 'text' car c'est dans l'enum
+      type: 'chat', 
       statut: 'envoye',
       dateEnvoi: new Date(),
       metadata: {
         maisonId: maisonId,
-        receiverId: receiverId || null, // Garder pour compatibilité
+        receiverId: receiverId || null, 
       },
     });
 
@@ -274,7 +274,7 @@ exports.createMessage = async (req, res) => {
       maisonId: maisonId,
     });
 
-    // Notification push uniquement si c'est le gérant qui envoie au résident
+    
     if (req.user.role === 'proprietaire' && receiverId && receiverId.trim() !== '') {
       try {
         const receiver = await User.findById(receiverId);
@@ -300,7 +300,7 @@ exports.createMessage = async (req, res) => {
   }
 };
 
-// GET /messages/private/:otherUserId -> historique messages privés (bidirectionnels)
+
 exports.getPrivateHistory = async (req, res) => {
   try {
     const myId = req.user._id;
@@ -322,15 +322,15 @@ exports.getPrivateHistory = async (req, res) => {
   }
 };
 
-// GET /messages/house/:maisonId -> historique messages de groupe (maison)
+
 exports.getHouseHistory = async (req, res) => {
   try {
     const maisonId = req.params.maisonId;
-    // Pour les messages de groupe, destinataire = expediteur (tous les membres voient)
-    // On filtre par maisonId dans metadata
+    
+    
     const messages = await Message.find({ 
       'metadata.maisonId': maisonId,
-      expediteur: { $ne: null }, // S'assurer qu'il y a un expéditeur
+      expediteur: { $ne: null }, 
     })
       .sort({ dateEnvoi: 1 })
       .lean();

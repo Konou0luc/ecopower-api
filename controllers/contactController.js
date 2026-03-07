@@ -1,13 +1,13 @@
-// Contrôleur pour gérer les messages de contact depuis le site web
+
 
 const { sendContactEmail } = require('../utils/emailUtils');
 
-// POST /contact - Envoyer un message de contact
+
 const sendContactMessage = async (req, res) => {
   try {
     const { name, email, phone, subject, message } = req.body;
 
-    // Validation des champs requis
+    
     if (!name || !email || !phone || !subject || !message) {
       return res.status(400).json({ 
         message: 'Tous les champs sont requis',
@@ -21,7 +21,7 @@ const sendContactMessage = async (req, res) => {
       });
     }
 
-    // Validation de l'email
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ 
@@ -30,7 +30,7 @@ const sendContactMessage = async (req, res) => {
       });
     }
 
-    // Validation du téléphone (au moins 8 caractères)
+    
     if (phone.replace(/[\s\-()]/g, '').length < 8) {
       return res.status(400).json({ 
         message: 'Format de téléphone invalide',
@@ -38,7 +38,7 @@ const sendContactMessage = async (req, res) => {
       });
     }
 
-    // Validation de la longueur du message
+    
     if (message.trim().length < 10) {
       return res.status(400).json({ 
         message: 'Le message est trop court',
@@ -46,7 +46,7 @@ const sendContactMessage = async (req, res) => {
       });
     }
 
-    // Envoyer l'email
+    
     const result = await sendContactEmail({
       name: name.trim(),
       email: email.trim(),

@@ -45,7 +45,7 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index pour améliorer les performances
+
 messageSchema.index({ expediteur: 1, createdAt: -1 });
 messageSchema.index({ destinataire: 1, createdAt: -1 });
 messageSchema.index({ statut: 1 });

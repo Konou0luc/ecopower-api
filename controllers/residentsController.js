@@ -8,7 +8,7 @@ const Notification = require('../models/Notification');
 const Log = require('../models/Log');
 const notifications = require('../utils/notifications');
 
-// Obtenir les résidents de la maison de l'utilisateur connecté
+
 const getMyHouseResidents = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -16,29 +16,29 @@ const getMyHouseResidents = async (req, res) => {
 
     console.log(`🔍 [RESIDENTS] getMyHouseResidents appelé pour userId: ${userId}, role: ${userRole}`);
 
-    // Vérifier que l'utilisateur existe
+    
     if (!userId) {
       console.log(`❌ [RESIDENTS] userId manquant`);
       return res.status(400).json({ message: 'Utilisateur non identifié' });
     }
 
-    // Trouver la maison de l'utilisateur
+    
     let maisonId;
     if (userRole === 'proprietaire') {
-      // Pour les propriétaires, prendre la première maison
+      
       const maison = await Maison.findOne({ proprietaireId: userId });
       if (!maison) {
         console.log(`❌ [RESIDENTS] Aucune maison trouvée pour le propriétaire ${userId}`);
-        return res.json([]); // Retourner une liste vide au lieu d'une erreur
+        return res.json([]); 
       }
       maisonId = maison._id;
       console.log(`✅ [RESIDENTS] Maison trouvée pour le propriétaire: ${maisonId}`);
     } else if (userRole === 'resident') {
-      // Pour les résidents, prendre leur maisonId
+      
       const user = await User.findById(userId);
       if (!user || !user.maisonId) {
         console.log(`❌ [RESIDENTS] Aucune maison trouvée pour le résident ${userId}`);
-        return res.json([]); // Retourner une liste vide au lieu d'une erreur
+        return res.json([]); 
       }
       maisonId = user.maisonId;
       console.log(`✅ [RESIDENTS] Maison trouvée pour le résident: ${maisonId}`);
@@ -47,11 +47,11 @@ const getMyHouseResidents = async (req, res) => {
       return res.status(403).json({ message: 'Rôle non autorisé' });
     }
 
-    // Récupérer tous les résidents de cette maison spécifique (exclure le gérant)
+    
     const residents = await User.find({
       maisonId: maisonId,
       role: 'resident',
-      _id: { $ne: userId } // Exclure l'utilisateur connecté
+      _id: { $ne: userId } 
     }).select('-motDePasse -firstLogin -createdAt -updatedAt -__v');
 
     console.log(`✅ [RESIDENTS] ${residents.length} résidents trouvés pour la maison ${maisonId}`);
@@ -65,19 +65,19 @@ const getMyHouseResidents = async (req, res) => {
   }
 };
 
-// Ajouter un résident
+
 const addResident = async (req, res) => {
   const { nom, prenom, email, telephone, maisonId } = req.body;
   
   try {
 
-    // Vérifier si l'email existe déjà
+    
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Cet email est déjà utilisé' });
     }
 
-    // Vérifier que la maison appartient bien au propriétaire connecté
+    
     const maison = await Maison.findOne({
       _id: maisonId,
       proprietaireId: req.user._id
@@ -87,27 +87,37 @@ const addResident = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Créer le résident sans mot de passe (authentification Google uniquement)
-    // Ne pas définir googleId (sera ajouté lors de la première connexion Google)
-    // Ne pas définir motDePasse (null par défaut)
+    if (
+      typeof maison.nbResidentsMax === 'number' &&
+      maison.nbResidentsMax > 0 &&
+      maison.listeResidents.length >= maison.nbResidentsMax
+    ) {
+      return res.status(400).json({
+        message: `Nombre maximal de résidents atteint pour cette maison (${maison.nbResidentsMax})`
+      });
+    }
+
+    
+    
+    
     const resident = new User({
       nom,
       prenom,
       email,
       telephone,
-      authMethod: 'google', // Les résidents utilisent Google Sign-In
+      authMethod: 'google', 
       role: 'resident',
       idProprietaire: req.user._id,
       maisonId: maisonId,
-      firstLogin: false // Plus besoin de firstLogin avec Google Sign-In
+      firstLogin: false 
     });
 
     await resident.save();
 
-    // Ajouter le résident dans la maison
+    
     await maison.ajouterResident(resident._id);
 
-    // Envoyer l'invitation Google Sign-In par email (priorité) et WhatsApp (fallback)
+    
     let invitationSent = { success: false };
     try {
       const { sendGoogleInvitationEmail } = require('../utils/emailUtils');
@@ -117,7 +127,7 @@ const addResident = async (req, res) => {
         maison.nomMaison
       );
       
-      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+      
       if (!invitationSent.success || invitationSent.mode === 'simulation') {
         const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
         invitationSent = await sendGoogleInvitationWhatsApp(
@@ -129,7 +139,7 @@ const addResident = async (req, res) => {
       }
     } catch (e) {
       console.error('Erreur lors de l\'envoi de l\'invitation:', e);
-      // En cas d'erreur, essayer WhatsApp en fallback
+      
       try {
         const { sendGoogleInvitationWhatsApp } = require('../utils/whatsappUtils');
         invitationSent = await sendGoogleInvitationWhatsApp(
@@ -143,7 +153,7 @@ const addResident = async (req, res) => {
       }
     }
 
-    // Notifier le propriétaire qu'un résident a été ajouté
+    
     try {
       await notifications.notifyNewResident(resident._id, req.user._id);
     } catch (e) {
@@ -182,7 +192,7 @@ const addResident = async (req, res) => {
   }
 };
 
-// Lister les résidents d'un propriétaire
+
 const getResidents = async (req, res) => {
   try {
     const residents = await User.find({
@@ -190,7 +200,7 @@ const getResidents = async (req, res) => {
       role: 'resident'
     }).select('-motDePasse -refreshToken');
 
-    // Ajouter le nom de la maison à chaque résident
+    
     const residentsWithHouse = await Promise.all(
       residents.map(async (resident) => {
         const maison = await Maison.findOne({ _id: resident.maisonId });
@@ -215,7 +225,7 @@ const getResidents = async (req, res) => {
   }
 };
 
-// Obtenir un résident spécifique
+
 const getResident = async (req, res) => {
   try {
     const { id } = req.params;
@@ -250,7 +260,7 @@ const getResident = async (req, res) => {
   }
 };
 
-// Supprimer un résident
+
 const deleteResident = async (req, res) => {
   try {
     const { id } = req.params;
@@ -265,7 +275,7 @@ const deleteResident = async (req, res) => {
       return res.status(404).json({ message: "Résident non trouvé" });
     }
 
-    // Retirer le résident de la maison associée
+    
     if (resident.maisonId) {
       await Maison.updateOne(
         { _id: resident.maisonId },
@@ -273,14 +283,14 @@ const deleteResident = async (req, res) => {
       );
     }
 
-    // Supprimer toutes les données associées au résident
-    // Supprimer les consommations du résident
+    
+    
     await Consommation.deleteMany({ residentId: resident._id });
 
-    // Supprimer les factures du résident
+    
     await Facture.deleteMany({ residentId: resident._id });
 
-    // Supprimer les messages (expéditeur ou destinataire)
+    
     await Message.deleteMany({
       $or: [
         { expediteur: resident._id },
@@ -288,13 +298,13 @@ const deleteResident = async (req, res) => {
       ]
     });
 
-    // Supprimer les notifications (destinataire)
+    
     await Notification.deleteMany({ destinataire: resident._id });
 
-    // Supprimer les logs liés au résident
+    
     await Log.deleteMany({ user: resident._id });
 
-    // Supprimer le résident
+    
     await User.findByIdAndDelete(resident._id);
 
     res.json({ message: "Résident et toutes ses données associées supprimés avec succès" });
@@ -304,7 +314,7 @@ const deleteResident = async (req, res) => {
   }
 };
 
-// Mettre à jour un résident
+
 const updateResident = async (req, res) => {
   try {
     const { id } = req.params;
@@ -331,7 +341,7 @@ const updateResident = async (req, res) => {
     if (prenom) resident.prenom = prenom;
     if (email) resident.email = email;
     if (telephone) resident.telephone = telephone;
-    if (maisonId) resident.maisonId = mongoose.Types.ObjectId(maisonId); // 🔥 update maison
+    if (maisonId) resident.maisonId = mongoose.Types.ObjectId(maisonId); 
 
     await resident.save();
 
@@ -355,12 +365,12 @@ const updateResident = async (req, res) => {
   }
 };
 
-// Réinitialiser le mot de passe d'un résident (pour le gérant)
+
 const resetResidentPassword = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifier que le résident appartient bien au propriétaire
+    
     const resident = await User.findOne({
       _id: id,
       idProprietaire: req.user._id,
@@ -371,15 +381,15 @@ const resetResidentPassword = async (req, res) => {
       return res.status(404).json({ message: "Résident non trouvé" });
     }
 
-    // Générer un nouveau mot de passe temporaire
+    
     const motDePasseTemporaire = generateTemporaryPassword();
 
-    // Mettre à jour le mot de passe et réinitialiser firstLogin
+    
     resident.motDePasse = motDePasseTemporaire;
     resident.firstLogin = true;
     await resident.save();
 
-    // Envoyer le nouveau mot de passe par email
+    
     try {
       const { sendPasswordResetEmail } = require('../utils/emailUtils');
       const emailResult = await sendPasswordResetEmail(
@@ -388,7 +398,7 @@ const resetResidentPassword = async (req, res) => {
         `${resident.prenom} ${resident.nom}`
       );
       
-      // Si l'email n'a pas pu être envoyé (mode simulation), essayer WhatsApp en fallback
+      
       if (!emailResult.success || emailResult.mode === 'simulation') {
         await sendWhatsAppCredentials(
           resident.telephone,
@@ -398,7 +408,7 @@ const resetResidentPassword = async (req, res) => {
       }
     } catch (e) {
       console.error('Erreur lors de l\'envoi du mot de passe:', e);
-      // En cas d'erreur, essayer WhatsApp en fallback
+      
       try {
         await sendWhatsAppCredentials(
           resident.telephone,

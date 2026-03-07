@@ -5,13 +5,13 @@ const Maison = require('../models/Maison');
 const { sendFactureNotification } = require('../utils/whatsappUtils');
 const notifications = require('../utils/notifications');
 
-// Générer une facture pour un résident
+
 const generateFacture = async (req, res) => {
   try {
     const { residentId } = req.params;
     const { mois, annee, fraisFixes = 0 } = req.body;
 
-    // Vérifier que l'utilisateur est autorisé
+    
     if (req.user.role === 'proprietaire') {
       const resident = await User.findOne({
         _id: residentId,
@@ -28,7 +28,7 @@ const generateFacture = async (req, res) => {
       }
     }
 
-    // Trouver la consommation pour cette période
+    
     const consommation = await Consommation.findOne({
       residentId,
       mois: parseInt(mois),
@@ -41,7 +41,7 @@ const generateFacture = async (req, res) => {
       });
     }
 
-    // Vérifier si une facture existe déjà
+    
     const existingFacture = await Facture.findOne({
       residentId,
       consommationId: consommation._id
@@ -54,19 +54,19 @@ const generateFacture = async (req, res) => {
       });
     }
 
-    // Calculer le montant avec le tarif de la maison
+    
     const maisonFact = await Maison.findById(consommation.maisonId);
     const tarif = maisonFact && typeof maisonFact.tarifKwh === 'number' ? maisonFact.tarifKwh : 0.1740;
     const montant = (consommation.kwh * tarif) + fraisFixes;
 
-    // Générer le numéro de facture
+    
     const numeroFacture = await Facture.genererNumeroFacture();
 
-    // Calculer la date d'échéance (30 jours après émission)
+    
     const dateEcheance = new Date();
     dateEcheance.setDate(dateEcheance.getDate() + 30);
 
-    // Créer la facture
+    
     const facture = new Facture({
       residentId,
       maisonId: consommation.maisonId,
@@ -83,11 +83,11 @@ const generateFacture = async (req, res) => {
 
     await facture.save();
 
-    // Marquer la consommation comme facturée
+    
     consommation.statut = 'facturee';
     await consommation.save();
 
-    // Envoyer notification WhatsApp au résident
+    
     const resident = await User.findById(residentId);
     if (resident && resident.telephone) {
       await sendFactureNotification(
@@ -98,7 +98,7 @@ const generateFacture = async (req, res) => {
       );
     }
 
-    // Envoyer une notification FCM au résident uniquement si c'est le gérant qui génère la facture
+    
     if (req.user.role === 'proprietaire') {
       try {
         const messageFacture = `Nouvelle facture ${numeroFacture}: ${montant.toFixed(2)} FCFA. Échéance: ${dateEcheance.toLocaleDateString('fr-FR')}`;
@@ -125,13 +125,13 @@ const generateFacture = async (req, res) => {
   }
 };
 
-// Obtenir les factures d'un résident
+
 const getFacturesByResident = async (req, res) => {
   try {
     const { residentId } = req.params;
     const { statut, annee } = req.query;
 
-    // Vérifier les autorisations
+    
     if (req.user.role === 'proprietaire') {
       const resident = await User.findOne({
         _id: residentId,
@@ -148,7 +148,7 @@ const getFacturesByResident = async (req, res) => {
       }
     }
 
-    // Construire la requête
+    
     const query = { residentId };
     if (statut) query.statut = statut;
     if (annee) {
@@ -163,7 +163,7 @@ const getFacturesByResident = async (req, res) => {
       .populate('maisonId', 'nomMaison')
       .sort({ dateEmission: -1 });
 
-    // Calculer les statistiques
+    
     const totalMontant = factures.reduce((sum, facture) => sum + facture.montant, 0);
     const facturesPayees = factures.filter(f => f.statut === 'payée');
     const totalPaye = facturesPayees.reduce((sum, facture) => sum + facture.montant, 0);
@@ -186,18 +186,18 @@ const getFacturesByResident = async (req, res) => {
   }
 };
 
-// Marquer une facture comme payée
+
 const markFactureAsPaid = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Trouver la facture
+    
     const facture = await Facture.findById(id);
     if (!facture) {
       return res.status(404).json({ message: 'Facture non trouvée' });
     }
 
-    // Vérifier les autorisations
+    
     if (req.user.role === 'proprietaire') {
       const resident = await User.findOne({
         _id: facture.residentId,
@@ -214,7 +214,7 @@ const markFactureAsPaid = async (req, res) => {
       }
     }
 
-    // Marquer comme payée
+    
     await facture.marquerPayee();
 
     res.json({
@@ -227,7 +227,7 @@ const markFactureAsPaid = async (req, res) => {
   }
 };
 
-// Obtenir une facture spécifique
+
 const getFacture = async (req, res) => {
   try {
     const { id } = req.params;
@@ -241,7 +241,7 @@ const getFacture = async (req, res) => {
       return res.status(404).json({ message: 'Facture non trouvée' });
     }
 
-    // Vérifier les autorisations
+    
     if (req.user.role === 'proprietaire') {
       const resident = await User.findOne({
         _id: facture.residentId._id,
@@ -265,13 +265,13 @@ const getFacture = async (req, res) => {
   }
 };
 
-// Obtenir les factures d'une maison
+
 const getFacturesByMaison = async (req, res) => {
   try {
     const { maisonId } = req.params;
     const { statut, annee } = req.query;
 
-    // Vérifier que l'utilisateur a accès à cette maison
+    
     let maison;
     if (req.user.role === 'proprietaire') {
       maison = await Maison.findOne({
@@ -289,7 +289,7 @@ const getFacturesByMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Construire la requête
+    
     const query = { maisonId };
     if (statut) query.statut = statut;
     if (annee) {
@@ -304,7 +304,7 @@ const getFacturesByMaison = async (req, res) => {
       .populate('consommationId', 'kwh mois annee')
       .sort({ dateEmission: -1 });
 
-    // Calculer les statistiques par résident
+    
     const statsParResident = {};
     factures.forEach(facture => {
       const residentId = facture.residentId._id.toString();
@@ -341,19 +341,19 @@ const getFacturesByMaison = async (req, res) => {
   }
 };
 
-// ===== NOUVELLES FONCTIONS POUR LES RÉSIDENTS =====
 
-// Obtenir les factures du résident connecté (sans passer par l'ID dans l'URL)
+
+
 const getMyFactures = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un résident
+    
     if (req.user.role !== 'resident') {
       return res.status(403).json({ message: 'Accès non autorisé - Résident requis' });
     }
 
     const { statut, annee } = req.query;
 
-    // Construire la requête pour le résident connecté
+    
     const query = { residentId: req.user._id };
     if (statut) query.statut = statut;
     if (annee) {
@@ -368,7 +368,7 @@ const getMyFactures = async (req, res) => {
       .populate('maisonId', 'nomMaison adresse')
       .sort({ dateEmission: -1 });
 
-    // Calculer les statistiques
+    
     const totalMontant = factures.reduce((sum, facture) => sum + facture.montant, 0);
     const facturesPayees = factures.filter(f => f.statut === 'payée');
     const totalPaye = facturesPayees.reduce((sum, facture) => sum + facture.montant, 0);
@@ -392,15 +392,15 @@ const getMyFactures = async (req, res) => {
   }
 };
 
-// Obtenir les factures de la maison du résident connecté
+
 const getMyMaisonFactures = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un résident
+    
     if (req.user.role !== 'resident') {
       return res.status(403).json({ message: 'Accès non autorisé - Résident requis' });
     }
 
-    // Récupérer la maison du résident
+    
     const maison = await Maison.findOne({
       listeResidents: req.user._id
     });
@@ -411,7 +411,7 @@ const getMyMaisonFactures = async (req, res) => {
 
     const { statut, annee } = req.query;
 
-    // Construire la requête pour la maison du résident
+    
     const query = { maisonId: maison._id };
     if (statut) query.statut = statut;
     if (annee) {
@@ -426,7 +426,7 @@ const getMyMaisonFactures = async (req, res) => {
       .populate('consommationId', 'kwh mois annee')
       .sort({ dateEmission: -1 });
 
-    // Calculer les statistiques par résident
+    
     const statsParResident = {};
     factures.forEach(facture => {
       const residentId = facture.residentId._id.toString();
@@ -471,7 +471,7 @@ module.exports = {
   markFactureAsPaid,
   getFacture,
   getFacturesByMaison,
-  // Nouvelles fonctions pour les résidents
+  
   getMyFactures,
   getMyMaisonFactures
 };

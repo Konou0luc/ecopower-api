@@ -1,18 +1,18 @@
 const Abonnement = require('../models/Abonnement');
 const FREE_MODE = process.env.FREE_MODE === 'true';
 
-// Middleware pour vérifier que l'abonnement est actif
+
 const checkSubscription = async (req, res, next) => {
   try {
     if (FREE_MODE) {
       return next();
     }
-    // Si l'utilisateur n'est pas un propriétaire, passer au suivant
+    
     if (req.user.role !== 'proprietaire') {
       return next();
     }
 
-    // Vérifier si le propriétaire a un abonnement
+    
     if (!req.user.abonnementId) {
       return res.status(403).json({ 
         message: 'Aucun abonnement actif',
@@ -20,7 +20,7 @@ const checkSubscription = async (req, res, next) => {
       });
     }
 
-    // Récupérer l'abonnement
+    
     const abonnement = await Abonnement.findById(req.user.abonnementId);
     
     if (!abonnement) {
@@ -30,7 +30,7 @@ const checkSubscription = async (req, res, next) => {
       });
     }
 
-    // Vérifier si l'abonnement est actif (paiement validé) et non expiré
+    
     if (!abonnement.isActive || !abonnement.isActif()) {
       return res.status(403).json({ 
         message: 'Abonnement expiré',
@@ -40,7 +40,7 @@ const checkSubscription = async (req, res, next) => {
       });
     }
 
-    // Ajouter l'abonnement à la requête pour utilisation ultérieure
+    
     req.abonnement = abonnement;
     next();
   } catch (error) {
@@ -51,7 +51,7 @@ const checkSubscription = async (req, res, next) => {
   }
 };
 
-// Middleware pour vérifier le quota de résidents
+
 const checkResidentQuota = async (req, res, next) => {
   try {
     if (FREE_MODE) {
@@ -63,14 +63,14 @@ const checkResidentQuota = async (req, res, next) => {
       });
     }
 
-    // Compter le nombre de résidents actuels du propriétaire
+    
     const User = require('../models/User');
     const nbResidentsActuels = await User.countDocuments({
       idProprietaire: req.user._id,
       role: 'resident'
     });
 
-    // Vérifier si on peut ajouter un résident
+    
     if (nbResidentsActuels >= req.abonnement.nbResidentsMax) {
       return res.status(403).json({ 
         message: `Quota de résidents atteint (${req.abonnement.nbResidentsMax} maximum)`,
@@ -90,7 +90,7 @@ const checkResidentQuota = async (req, res, next) => {
   }
 };
 
-// Middleware pour vérifier si l'abonnement expire bientôt (dans les 7 jours)
+
 const checkSubscriptionExpiry = async (req, res, next) => {
   try {
     if (FREE_MODE) {
@@ -103,7 +103,7 @@ const checkSubscriptionExpiry = async (req, res, next) => {
     const joursRestants = req.abonnement.joursRestants();
     
     if (joursRestants <= 7 && joursRestants > 0) {
-      // Ajouter un avertissement dans la réponse
+      
       res.locals.subscriptionWarning = {
         message: `Votre abonnement expire dans ${joursRestants} jour(s)`,
         joursRestants,
@@ -114,7 +114,7 @@ const checkSubscriptionExpiry = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Erreur lors de la vérification de l\'expiration:', error);
-    next(); // Continuer même en cas d'erreur
+    next(); 
   }
 };
 

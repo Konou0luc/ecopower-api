@@ -2,10 +2,16 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(helmet());
 
 app.set('trust proxy', 1);
 
@@ -14,12 +20,7 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:5173',
-      'http://localhost:5174',
       /^https:\/\/.*\.vercel\.app$/,
-      /^https:\/\/.*\.netlify\.app$/,
     ];
     
     const isAllowed = allowedOrigins.some(allowed => {
@@ -41,15 +42,30 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400, // 24 heures
+  maxAge: 86400, 
 };
 
 app.use(cors(corsOptions));
 
 app.options(/.*/, cors(corsOptions));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+app.use(mongoSanitize());
+
+app.use(xss());
+
+app.use(hpp());
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
+  message: 'Trop de requêtes depuis cette adresse IP, veuillez réessayer dans 15 minutes',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -88,12 +104,10 @@ app.use('/maisons', require('./routes/maisons'));
 app.use('/messages', require('./routes/messages'));
 app.use('/admin', require('./routes/admin'));
 
-// Exposer config pour le frontend
 app.get('/config', (req, res) => {
   res.json({ freeMode: process.env.FREE_MODE === 'true' });
 });
 
-// Infos de contact dynamiques (À propos - email, téléphone, site web)
 const appInfoController = require('./controllers/appInfoController');
 app.get('/app-info', appInfoController.getAppInfo);
 

@@ -1,7 +1,7 @@
 const os = require('os');
 const mongoose = require('mongoose');
 
-// Fonction pour obtenir l'uptime du système
+
 const getSystemUptime = () => {
   const uptimeSeconds = process.uptime();
   const days = Math.floor(uptimeSeconds / 86400);
@@ -16,21 +16,21 @@ const getSystemUptime = () => {
   };
 };
 
-// Fonction pour obtenir les informations mémoire
+
 const getMemoryInfo = () => {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const usedMemory = totalMemory - freeMemory;
   
   return {
-    total: Math.round(totalMemory / 1024 / 1024), // MB
-    used: Math.round(usedMemory / 1024 / 1024), // MB
-    free: Math.round(freeMemory / 1024 / 1024), // MB
+    total: Math.round(totalMemory / 1024 / 1024), 
+    used: Math.round(usedMemory / 1024 / 1024), 
+    free: Math.round(freeMemory / 1024 / 1024), 
     percentage: Math.round((usedMemory / totalMemory) * 100)
   };
 };
 
-// Fonction pour tester la connexion à la base de données
+
 const testDatabaseConnection = async () => {
   try {
     const state = mongoose.connection.readyState;
@@ -42,7 +42,7 @@ const testDatabaseConnection = async () => {
     };
     
     const isConnected = state === 1;
-    const responseTime = isConnected ? Math.floor(Math.random() * 20) + 5 : null; // 5-25ms
+    const responseTime = isConnected ? Math.floor(Math.random() * 20) + 5 : null; 
     
     return {
       status: isConnected ? 'Opérationnel' : 'Hors ligne',
@@ -61,9 +61,9 @@ const testDatabaseConnection = async () => {
   }
 };
 
-// Fonction pour tester l'API
+
 const testApiHealth = () => {
-  const responseTime = Math.floor(Math.random() * 10) + 1; // 1-10ms
+  const responseTime = Math.floor(Math.random() * 10) + 1; 
   return {
     status: 'Opérationnel',
     responseTime,
@@ -71,9 +71,9 @@ const testApiHealth = () => {
   };
 };
 
-// Fonction pour tester les notifications
+
 const testNotificationsHealth = () => {
-  const responseTime = Math.floor(Math.random() * 15) + 3; // 3-18ms
+  const responseTime = Math.floor(Math.random() * 15) + 3; 
   return {
     status: 'Opérationnel',
     responseTime,
@@ -81,22 +81,22 @@ const testNotificationsHealth = () => {
   };
 };
 
-// Fonction pour obtenir les informations de stockage
+
 const getStorageInfo = () => {
-  // Simulation des informations de stockage
-  const totalSpace = 1024 * 1024 * 1024; // 1GB en bytes
-  const usedSpace = Math.floor(totalSpace * 0.75); // 75% utilisé
+  
+  const totalSpace = 1024 * 1024 * 1024; 
+  const usedSpace = Math.floor(totalSpace * 0.75); 
   const freeSpace = totalSpace - usedSpace;
   
   return {
-    total: Math.round(totalSpace / 1024 / 1024), // MB
-    used: Math.round(usedSpace / 1024 / 1024), // MB
-    free: Math.round(freeSpace / 1024 / 1024), // MB
+    total: Math.round(totalSpace / 1024 / 1024), 
+    used: Math.round(usedSpace / 1024 / 1024), 
+    free: Math.round(freeSpace / 1024 / 1024), 
     percentage: 75
   };
 };
 
-// Endpoint principal pour les informations système
+
 const getSystemStatus = async (req, res) => {
   try {
     const [databaseStatus, memoryInfo, storageInfo] = await Promise.all([
@@ -167,7 +167,7 @@ const getSystemStatus = async (req, res) => {
   }
 };
 
-// Endpoint pour les informations détaillées du système
+
 const getSystemInfo = async (req, res) => {
   try {
     const memoryInfo = getMemoryInfo();

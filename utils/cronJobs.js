@@ -4,12 +4,12 @@ const Abonnement = require('../models/Abonnement');
 const Facture = require('../models/Facture');
 const { notifySubscriptionExpiry, notifyOverdueInvoices } = require('./notifications');
 
-// Vérifier et marquer les abonnements expirés
+
 const checkExpiredSubscriptions = async () => {
   try {
     console.log('🕐 Vérification des abonnements expirés...');
     
-    // Utiliser la méthode statique du modèle
+    
     const result = await Abonnement.updateExpiredSubscriptions();
     
     console.log(`✅ ${result.modifiedCount} abonnements marqués comme expirés`);
@@ -18,7 +18,7 @@ const checkExpiredSubscriptions = async () => {
   }
 };
 
-// Vérifier et marquer les factures en retard
+
 const checkOverdueInvoices = async () => {
   try {
     console.log('🕐 Vérification des factures en retard...');
@@ -40,7 +40,7 @@ const checkOverdueInvoices = async () => {
   }
 };
 
-// Nettoyer les anciens messages (plus de 6 mois)
+
 const cleanupOldMessages = async () => {
   try {
     console.log('🕐 Nettoyage des anciens messages...');
@@ -51,7 +51,7 @@ const cleanupOldMessages = async () => {
     const Message = require('../models/Message');
     const result = await Message.deleteMany({
       dateEnvoi: { $lt: sixMonthsAgo },
-      type: { $in: ['text', 'system'] } // Garder les messages de facture
+      type: { $in: ['text', 'system'] } 
     });
 
     console.log(`✅ ${result.deletedCount} anciens messages supprimés`);
@@ -60,7 +60,7 @@ const cleanupOldMessages = async () => {
   }
 };
 
-// Générer des statistiques quotidiennes
+
 const generateDailyStats = async () => {
   try {
     console.log('🕐 Génération des statistiques quotidiennes...');
@@ -69,7 +69,7 @@ const generateDailyStats = async () => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     
-    // Statistiques des consommations
+    
     const Consommation = require('../models/Consommation');
     const consommationsHier = await Consommation.countDocuments({
       createdAt: {
@@ -78,7 +78,7 @@ const generateDailyStats = async () => {
       }
     });
     
-    // Statistiques des factures
+    
     const facturesHier = await Facture.countDocuments({
       dateEmission: {
         $gte: yesterday,
@@ -86,7 +86,7 @@ const generateDailyStats = async () => {
       }
     });
     
-    // Statistiques des paiements
+    
     const paiementsHier = await Facture.countDocuments({
       datePaiement: {
         $gte: yesterday,
@@ -105,12 +105,12 @@ const generateDailyStats = async () => {
   }
 };
 
-// Vérifier la santé de la base de données
+
 const checkDatabaseHealth = async () => {
   try {
     console.log('🕐 Vérification de la santé de la base de données...');
     
-    // Vérifier les connexions
+    
     const mongoose = require('mongoose');
     const dbState = mongoose.connection.readyState;
     
@@ -123,7 +123,7 @@ const checkDatabaseHealth = async () => {
     
     console.log(`📊 État de la base de données: ${states[dbState]}`);
     
-    // Compter les documents
+    
     const User = require('../models/User');
     const Abonnement = require('../models/Abonnement');
     const Facture = require('../models/Facture');
@@ -147,7 +147,7 @@ const checkDatabaseHealth = async () => {
   }
 };
 
-// Initialiser les tâches cron
+
 const initCronJobs = () => {
   if (FREE_MODE) {
     console.log('⏸️ [CRON] Mode gratuit activé: cron abonnements désactivés');
@@ -155,43 +155,43 @@ const initCronJobs = () => {
     }
   console.log('🚀 Initialisation des tâches cron...');
   
-  // Vérifier les abonnements expirés tous les jours à 2h00
+  
   cron.schedule('0 2 * * *', checkExpiredSubscriptions, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Vérifier les factures en retard tous les jours à 3h00
+  
   cron.schedule('0 3 * * *', checkOverdueInvoices, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Envoyer les notifications d'expiration d'abonnement tous les jours à 9h00
+  
   cron.schedule('0 9 * * *', notifySubscriptionExpiry, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Envoyer les notifications de factures en retard tous les jours à 10h00
+  
   cron.schedule('0 10 * * *', notifyOverdueInvoices, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Nettoyer les anciens messages tous les dimanches à 4h00
+  
   cron.schedule('0 4 * * 0', cleanupOldMessages, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Générer les statistiques quotidiennes tous les jours à 6h00
+  
   cron.schedule('0 6 * * *', generateDailyStats, {
     scheduled: true,
     timezone: "Europe/Paris"
   });
   
-  // Vérifier la santé de la DB toutes les heures
+  
   cron.schedule('0 * * * *', checkDatabaseHealth, {
     scheduled: true,
     timezone: "Europe/Paris"
@@ -200,14 +200,14 @@ const initCronJobs = () => {
   console.log('✅ Tâches cron initialisées');
 };
 
-// Arrêter toutes les tâches cron
+
 const stopCronJobs = () => {
   console.log('🛑 Arrêt des tâches cron...');
   cron.getTasks().forEach(task => task.stop());
   console.log('✅ Tâches cron arrêtées');
 };
 
-// Exécuter une tâche manuellement
+
 const runTaskManually = async (taskName) => {
   console.log(`🔧 Exécution manuelle de la tâche: ${taskName}`);
   

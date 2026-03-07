@@ -1,58 +1,58 @@
-// Utilitaires pour l'envoi d'emails
-// Utilise nodemailer pour l'envoi d'emails réels
+
+
 
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
 
-// Obtenir l'URL ou le chemin du logo
+
 const getLogoUrl = () => {
-  // Option 1: URL publique du logo (recommandé pour la production)
+  
   if (process.env.EMAIL_LOGO_URL) {
     return process.env.EMAIL_LOGO_URL;
   }
   
-  // Option 2: URL automatique basée sur l'API (pour Vercel)
-  // Si on est sur Vercel, utiliser l'URL de l'API
+  
+  
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}/logo.png`;
   }
   
-  // Option 3: URL de l'API si configurée
+  
   if (process.env.API_URL) {
     return `${process.env.API_URL}/logo.png`;
   }
   
-  // Option 4: Chemin local du logo (pour développement local)
+  
   const logoPath = path.join(__dirname, '../image/app/logo.png');
   if (fs.existsSync(logoPath)) {
-    // Si le logo existe localement, on peut l'utiliser comme CID (Content-ID) pour l'inclure inline
+    
     return logoPath;
   }
   
-  // Option 5: Pas de logo configuré
+  
   return null;
 };
 
-// Créer un transporteur email (peut être configuré avec Gmail, SMTP, etc.)
+
 const createTransporter = () => {
-  // Configuration depuis les variables d'environnement
+  
   const emailConfig = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true pour 465, false pour autres ports
+    secure: process.env.SMTP_SECURE === 'true', 
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     },
   };
 
-  // Si les credentials ne sont pas configurés, utiliser un transporteur de test
+  
   if (!emailConfig.auth.user || !emailConfig.auth.pass) {
     console.warn('⚠️ [EMAIL] Configuration SMTP non trouvée. Utilisation du mode test (emails ne seront pas envoyés).');
     console.warn('⚠️ [EMAIL] Configurez SMTP_USER, SMTP_PASSWORD, SMTP_HOST dans votre .env');
     
-    // Retourner null pour indiquer qu'on ne peut pas envoyer d'emails
+    
     return null;
   }
 
@@ -64,13 +64,13 @@ const createTransporter = () => {
   }
 };
 
-// Envoyer un email avec un mot de passe temporaire
+
 const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => {
   try {
     const transporter = createTransporter();
     
     if (!transporter) {
-      // Mode développement : afficher dans la console
+      
       console.log('📧 [EMAIL SIMULÉ] Email de réinitialisation de mot de passe:');
       console.log(`   Destinataire: ${email}`);
       console.log(`   Nom: ${fullName || 'Utilisateur'}`);
@@ -92,12 +92,12 @@ const sendPasswordResetEmail = async (email, motDePasseTemporaire, fullName) => 
       : '';
     
     const attachments = [];
-    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    
     if (logoUrl && !logoUrl.startsWith('http')) {
       attachments.push({
         filename: 'logo.png',
         path: logoUrl,
-        cid: 'logo' // Content-ID pour référence dans le HTML
+        cid: 'logo' 
       });
     }
 
@@ -196,7 +196,7 @@ Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email 
   } catch (error) {
     console.error('❌ [EMAIL] Erreur lors de l\'envoi de l\'email:', error);
     
-    // En cas d'erreur, afficher dans la console pour le développement
+    
     console.log('📧 [EMAIL FALLBACK] Mot de passe temporaire pour développement:');
     console.log(`   Email: ${email}`);
     console.log(`   Mot de passe: ${motDePasseTemporaire}`);
@@ -209,13 +209,13 @@ Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email 
   }
 };
 
-// Envoyer les identifiants de connexion (pour nouveaux résidents)
+
 const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
   try {
     const transporter = createTransporter();
     
     if (!transporter) {
-      // Mode développement : afficher dans la console
+      
       console.log('📧 [EMAIL SIMULÉ] Email d\'identifiants:');
       console.log(`   Destinataire: ${email}`);
       console.log(`   Nom: ${fullName || 'Utilisateur'}`);
@@ -237,12 +237,12 @@ const sendCredentialsEmail = async (email, motDePasseTemporaire, fullName) => {
       : '';
     
     const attachments = [];
-    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    
     if (logoUrl && !logoUrl.startsWith('http')) {
       attachments.push({
         filename: 'logo.png',
         path: logoUrl,
-        cid: 'logo' // Content-ID pour référence dans le HTML
+        cid: 'logo' 
       });
     }
 
@@ -337,7 +337,7 @@ Pour vous connecter :
   } catch (error) {
     console.error('❌ [EMAIL] Erreur lors de l\'envoi de l\'email:', error);
     
-    // En cas d'erreur, afficher dans la console pour le développement
+    
     console.log('📧 [EMAIL FALLBACK] Identifiants pour développement:');
     console.log(`   Email: ${email}`);
     console.log(`   Mot de passe: ${motDePasseTemporaire}`);
@@ -350,13 +350,13 @@ Pour vous connecter :
   }
 };
 
-// Envoyer une invitation Google Sign-In (pour nouveaux résidents)
+
 const sendGoogleInvitationEmail = async (email, fullName, maisonName) => {
   try {
     const transporter = createTransporter();
     
     if (!transporter) {
-      // Mode développement : afficher dans la console
+      
       console.log('📧 [EMAIL SIMULÉ] Invitation Google Sign-In:');
       console.log(`   Destinataire: ${email}`);
       console.log(`   Nom: ${fullName || 'Utilisateur'}`);
@@ -497,14 +497,14 @@ Pour vous connecter :
   }
 };
 
-// Envoyer un email de contact depuis le formulaire du site web
+
 const sendContactEmail = async (contactData) => {
   try {
     const { name, email, phone, subject, message } = contactData;
     const transporter = createTransporter();
     
     if (!transporter) {
-      // Mode développement : afficher dans la console
+      
       console.log('📧 [EMAIL SIMULÉ] Email de contact:');
       console.log(`   Nom: ${name}`);
       console.log(`   Email: ${email}`);
@@ -528,16 +528,16 @@ const sendContactEmail = async (contactData) => {
       : '';
     
     const attachments = [];
-    // Si le logo est un chemin local, l'ajouter comme pièce jointe inline
+    
     if (logoUrl && !logoUrl.startsWith('http')) {
       attachments.push({
         filename: 'logo.png',
         path: logoUrl,
-        cid: 'logo' // Content-ID pour référence dans le HTML
+        cid: 'logo' 
       });
     }
 
-    // Traduire le sujet
+    
     const subjectLabels = {
       'demande-info': 'Demande d\'information',
       'devis': 'Demande de devis',
@@ -552,7 +552,7 @@ const sendContactEmail = async (contactData) => {
     const mailOptions = {
       from: `"Ecopower Contact" <${process.env.SMTP_USER}>`,
       to: recipientEmail,
-      replyTo: email, // Permettre de répondre directement à l'expéditeur
+      replyTo: email, 
       subject: `[Contact Ecopower] ${subjectLabel} - ${name}`,
       attachments: attachments.length > 0 ? attachments : undefined,
       html: `
@@ -652,7 +652,7 @@ Pour répondre, répondez directement à cet email.
   } catch (error) {
     console.error('❌ [EMAIL] Erreur lors de l\'envoi de l\'email de contact:', error);
     
-    // En cas d'erreur, afficher dans la console pour le développement
+    
     console.log('📧 [EMAIL FALLBACK] Message de contact pour développement:');
     console.log(`   Nom: ${contactData.name}`);
     console.log(`   Email: ${contactData.email}`);

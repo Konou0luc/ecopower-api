@@ -2,7 +2,7 @@ const Abonnement = require('../models/Abonnement');
 const User = require('../models/User');
 const { sendSubscriptionExpiryNotification } = require('../utils/whatsappUtils');
 
-// Obtenir la liste des offres d'abonnement
+
 const getOffres = async (req, res) => {
   try {
     const offres = [
@@ -60,17 +60,17 @@ const getOffres = async (req, res) => {
   }
 };
 
-// Souscrire à un abonnement
+
 const souscrire = async (req, res) => {
   try {
     const { type } = req.body;
 
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent souscrire à un abonnement' });
     }
 
-    // Vérifier si l'utilisateur a déjà un abonnement actif
+    
     if (req.user.abonnementId) {
       const existingAbonnement = await Abonnement.findById(req.user.abonnementId);
       if (existingAbonnement && existingAbonnement.isActif()) {
@@ -79,16 +79,16 @@ const souscrire = async (req, res) => {
           abonnement: existingAbonnement
         });
       }
-      // Si l'abonnement existe mais n'est pas actif, on peut le remplacer
+      
       if (existingAbonnement && !existingAbonnement.isActif()) {
-        // Supprimer l'ancien abonnement
+        
         await Abonnement.findByIdAndDelete(existingAbonnement._id);
         req.user.abonnementId = null;
         await req.user.save();
       }
     }
 
-    // Définir les détails de l'abonnement selon le type
+    
     const offres = {
       basic: { prix: 500, nbResidentsMax: 5 },
       premium: { prix: 1000, nbResidentsMax: 15 },
@@ -100,12 +100,12 @@ const souscrire = async (req, res) => {
       return res.status(400).json({ message: 'Type d\'abonnement invalide' });
     }
 
-    // Calculer les dates
+    
     const dateDebut = new Date();
     const dateFin = new Date();
     dateFin.setMonth(dateFin.getMonth() + 1);
 
-    // Créer l'abonnement
+    
     const abonnement = new Abonnement({
       type,
       prix: offre.prix,
@@ -119,7 +119,7 @@ const souscrire = async (req, res) => {
 
     await abonnement.save();
 
-    // Mettre à jour l'utilisateur
+    
     req.user.abonnementId = abonnement._id;
     await req.user.save();
 
@@ -135,7 +135,7 @@ const souscrire = async (req, res) => {
 
 const FREE_MODE = process.env.FREE_MODE === 'true';
 
-// Renouveler un abonnement
+
 const renouveler = async (req, res) => {
   try {
     if (FREE_MODE) {
@@ -156,12 +156,12 @@ const renouveler = async (req, res) => {
     }
     console.log('🔄 [API] Début du renouvellement d\'abonnement pour:', req.user._id);
     
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent renouveler un abonnement' });
     }
 
-    // Vérifier que l'utilisateur a un abonnement
+    
     if (!req.user.abonnementId) {
       return res.status(400).json({ message: 'Aucun abonnement à renouveler' });
     }
@@ -180,10 +180,10 @@ const renouveler = async (req, res) => {
       isActive: abonnement.isActive
     });
 
-    // Renouveler l'abonnement
+    
     await abonnement.renouveler();
 
-    // Recharger l'abonnement pour avoir les données mises à jour
+    
     const abonnementRenouvele = await Abonnement.findById(req.user.abonnementId);
 
     console.log('✅ [API] Abonnement renouvelé:', {
@@ -210,10 +210,10 @@ const renouveler = async (req, res) => {
   }
 };
 
-// Obtenir les détails de l'abonnement actuel
+
 const getAbonnementActuel = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent consulter leur abonnement' });
     }
@@ -227,13 +227,13 @@ const getAbonnementActuel = async (req, res) => {
       return res.status(404).json({ message: 'Abonnement non trouvé' });
     }
 
-    // Vérifier et mettre à jour le statut de l'abonnement
+    
     const isActif = abonnement.isActif();
     
-    // Recharger l'abonnement pour avoir les données mises à jour
+    
     await abonnement.save();
 
-    // Compter le nombre de résidents actuels
+    
     const nbResidentsActuels = await User.countDocuments({
       idProprietaire: req.user._id,
       role: 'resident'
@@ -254,10 +254,10 @@ const getAbonnementActuel = async (req, res) => {
   }
 };
 
-// Annuler un abonnement
+
 const annuler = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent annuler un abonnement' });
     }
@@ -271,11 +271,11 @@ const annuler = async (req, res) => {
       return res.status(404).json({ message: 'Abonnement non trouvé' });
     }
 
-    // Marquer l'abonnement comme suspendu
+    
     abonnement.statut = 'suspendu';
     await abonnement.save();
 
-    // Supprimer la référence de l'utilisateur
+    
     req.user.abonnementId = null;
     await req.user.save();
 
@@ -289,12 +289,8 @@ const annuler = async (req, res) => {
   }
 };
 
-// Activer un abonnement (admin seulement)
-/**
- * PATCH /abonnements/:id/activer
- * Rôle: admin
- * Effet: met isActive=true sur l'abonnement ciblé
- */
+
+
 const activer = async (req, res) => {
   try {
     const { id } = req.params;
@@ -314,11 +310,7 @@ const activer = async (req, res) => {
   }
 };
 
-/**
- * PATCH /abonnements/:id/desactiver
- * Rôle: admin
- * Effet: met isActive=false sur l'abonnement ciblé
- */
+
 const desactiver = async (req, res) => {
   try {
     const { id } = req.params;
@@ -338,10 +330,10 @@ const desactiver = async (req, res) => {
   }
 };
 
-// Obtenir l'historique des abonnements
+
 const getHistorique = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un propriétaire
+    
     if (req.user.role !== 'proprietaire') {
       return res.status(403).json({ message: 'Seuls les propriétaires peuvent consulter l\'historique' });
     }

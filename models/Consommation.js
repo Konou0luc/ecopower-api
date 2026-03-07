@@ -59,7 +59,7 @@ const consommationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Méthode virtuelle pour obtenir la période lisible
+
 consommationSchema.virtual('periode').get(function () {
   const mois = [
     'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -68,10 +68,10 @@ consommationSchema.virtual('periode').get(function () {
   return `${mois[this.mois - 1]} ${this.annee}`;
 });
 
-// Inclure les virtuals dans JSON
+
 consommationSchema.set('toJSON', { virtuals: true });
 
-// Index pour optimiser les requêtes (sans contrainte unique pour permettre plusieurs relevés par mois)
+
 consommationSchema.index({
   residentId: 1,
   maisonId: 1,
@@ -79,7 +79,7 @@ consommationSchema.index({
   annee: 1
 });
 
-// Index pour optimiser les requêtes
+
 consommationSchema.index({ residentId: 1, annee: 1, mois: 1 });
 consommationSchema.index({ maisonId: 1, annee: 1, mois: 1 });
 

@@ -2,7 +2,7 @@ const Consommation = require("../models/Consommation");
 const User = require("../models/User");
 const Maison = require("../models/Maison");
 const notifications = require("../utils/notifications");
-// Enregistrer une consommation
+
 const addConsommation = async (req, res) => {
   try {
     const {
@@ -15,9 +15,9 @@ const addConsommation = async (req, res) => {
       commentaire,
     } = req.body;
 
-    // Vérifier que l'utilisateur est autorisé
+    
     if (req.user.role === "proprietaire") {
-      // Vérifier résident
+      
       const resident = await User.findOne({
         _id: residentId,
         idProprietaire: req.user._id,
@@ -26,7 +26,7 @@ const addConsommation = async (req, res) => {
       if (!resident)
         return res.status(404).json({ message: "Résident non trouvé" });
 
-      // Vérifier maison
+      
       const maison = await Maison.findOne({
         _id: maisonId,
         proprietaireId: req.user._id,
@@ -34,7 +34,7 @@ const addConsommation = async (req, res) => {
       if (!maison)
         return res.status(404).json({ message: "Maison non trouvée" });
     } else {
-      // Le résident enregistre pour lui-même
+      
       if (residentId !== req.user._id.toString()) {
         return res.status(403).json({
           message: "Vous ne pouvez enregistrer que votre propre consommation",
@@ -48,7 +48,7 @@ const addConsommation = async (req, res) => {
         return res.status(404).json({ message: "Maison non trouvée" });
     }
 
-    // Vérifier la limite de 2 relevés par mois
+    
     const countReleves = await Consommation.countDocuments({
       residentId,
       maisonId,
@@ -62,7 +62,7 @@ const addConsommation = async (req, res) => {
       });
     }
 
-    // Calcul du kWh
+    
     const kwh = currentIndex - previousIndex;
     if (kwh < 0) {
       return res
@@ -70,14 +70,14 @@ const addConsommation = async (req, res) => {
         .json({ message: "L'index actuel doit être ≥ à l'ancien index" });
     }
 
-    // Récupérer la maison pour calcul du montant
+    
     const maison = await Maison.findById(maisonId);
     if (!maison) {
       return res.status(404).json({ message: "Maison non trouvée" });
     }
     const montant = kwh * maison.tarifKwh;
 
-    // Créer la consommation avec dateReleve
+    
     const consommation = new Consommation({
       residentId,
       maisonId,
@@ -88,12 +88,12 @@ const addConsommation = async (req, res) => {
       commentaire,
       kwh,
       montant,
-      dateReleve: new Date(), // Date du relevé (permet de différencier les relevés du même mois)
+      dateReleve: new Date(), 
     });
 
     await consommation.save();
 
-    // Envoyer une notification FCM au résident uniquement si c'est le gérant qui crée le relevé
+    
     if (req.user.role === "proprietaire") {
       try {
         const moisNoms = [
@@ -109,7 +109,7 @@ const addConsommation = async (req, res) => {
       }
     }
 
-    // Vérifier consommation excessive par rapport aux 3 dernières
+    
     const troisDernieres = await Consommation.find({
       residentId,
       _id: { $ne: consommation._id },
@@ -143,13 +143,13 @@ const addConsommation = async (req, res) => {
   }
 };
 
-// Obtenir l'historique des consommations d'un résident
+
 const getConsommationsByResident = async (req, res) => {
   try {
     const { residentId } = req.params;
     const { annee, mois } = req.query;
 
-    // Vérifier autorisation
+    
     if (req.user.role === "proprietaire") {
       const resident = await User.findOne({
         _id: residentId,
@@ -162,7 +162,7 @@ const getConsommationsByResident = async (req, res) => {
       return res.status(403).json({ message: "Accès non autorisé" });
     }
 
-    // Requête
+    
     const query = { residentId };
     if (annee) query.annee = parseInt(annee);
     if (mois) query.mois = parseInt(mois);
@@ -171,7 +171,7 @@ const getConsommationsByResident = async (req, res) => {
       .populate("maisonId", "nomMaison")
       .sort({ annee: -1, mois: -1, dateReleve: -1 });
 
-    // Stats
+    
     const totalKwh = consommations.reduce((s, c) => s + c.kwh, 0);
     const totalMontant = consommations.reduce((s, c) => s + c.montant, 0);
     const moyenneKwh =
@@ -194,13 +194,13 @@ const getConsommationsByResident = async (req, res) => {
   }
 };
 
-// Obtenir les consommations d'une maison
+
 const getConsommationsByMaison = async (req, res) => {
   try {
     const { maisonId } = req.params;
     const { annee, mois } = req.query;
 
-    // Vérifier maison accessible
+    
     let maison;
     if (req.user.role === "proprietaire") {
       maison = await Maison.findOne({
@@ -215,7 +215,7 @@ const getConsommationsByMaison = async (req, res) => {
     }
     if (!maison) return res.status(404).json({ message: "Maison non trouvée" });
 
-    // Requête
+    
     const query = { maisonId };
     if (annee) query.annee = parseInt(annee);
     if (mois) query.mois = parseInt(mois);
@@ -224,7 +224,7 @@ const getConsommationsByMaison = async (req, res) => {
       .populate("residentId", "nom prenom email")
       .sort({ annee: -1, mois: -1, dateReleve: -1, "residentId.nom": 1 });
 
-    // Stats par résident
+    
     const statsParResident = {};
     consommations.forEach((conso) => {
       const rId = conso.residentId._id.toString();
@@ -254,7 +254,7 @@ const getConsommationsByMaison = async (req, res) => {
   }
 };
 
-// Mettre à jour une consommation
+
 const updateConsommation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -264,7 +264,7 @@ const updateConsommation = async (req, res) => {
     if (!consommation)
       return res.status(404).json({ message: "Consommation non trouvée" });
 
-    // Vérifier autorisation
+    
     if (req.user.role === "proprietaire") {
       const resident = await User.findOne({
         _id: consommation.residentId,
@@ -277,7 +277,7 @@ const updateConsommation = async (req, res) => {
       return res.status(403).json({ message: "Accès non autorisé" });
     }
 
-    // Maj des valeurs
+    
     if (previousIndex !== undefined) consommation.previousIndex = previousIndex;
     if (currentIndex !== undefined) consommation.currentIndex = currentIndex;
     if (commentaire !== undefined) consommation.commentaire = commentaire;
@@ -296,7 +296,7 @@ const updateConsommation = async (req, res) => {
   }
 };
 
-// Supprimer une consommation
+
 const deleteConsommation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -304,7 +304,7 @@ const deleteConsommation = async (req, res) => {
     if (!consommation)
       return res.status(404).json({ message: "Consommation non trouvée" });
 
-    // Seul le propriétaire peut supprimer
+    
     if (req.user.role !== "proprietaire")
       return res.status(403).json({ message: "Accès non autorisé" });
 
@@ -332,19 +332,19 @@ const deleteConsommation = async (req, res) => {
   }
 };
 
-// ===== NOUVELLES FONCTIONS POUR LES RÉSIDENTS =====
 
-// Obtenir les consommations du résident connecté (sans passer par l'ID dans l'URL)
+
+
 const getMyConsommations = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un résident
+    
     if (req.user.role !== 'resident') {
       return res.status(403).json({ message: 'Accès non autorisé - Résident requis' });
     }
 
     const { annee, mois } = req.query;
 
-    // Construire la requête pour le résident connecté
+    
     const query = { residentId: req.user._id };
     if (annee) query.annee = parseInt(annee);
     if (mois) query.mois = parseInt(mois);
@@ -353,7 +353,7 @@ const getMyConsommations = async (req, res) => {
       .populate("maisonId", "nomMaison adresse")
       .sort({ annee: -1, mois: -1, dateReleve: -1 });
 
-    // Calculer les statistiques
+    
     const totalKwh = consommations.reduce((s, c) => s + c.kwh, 0);
     const totalMontant = consommations.reduce((s, c) => s + c.montant, 0);
     const moyenneKwh = consommations.length > 0 ? totalKwh / consommations.length : 0;
@@ -376,15 +376,15 @@ const getMyConsommations = async (req, res) => {
   }
 };
 
-// Obtenir les consommations de la maison du résident connecté
+
 const getMyMaisonConsommations = async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est un résident
+    
     if (req.user.role !== 'resident') {
       return res.status(403).json({ message: 'Accès non autorisé - Résident requis' });
     }
 
-    // Récupérer la maison du résident
+    
     const maison = await Maison.findOne({
       listeResidents: req.user._id
     });
@@ -395,7 +395,7 @@ const getMyMaisonConsommations = async (req, res) => {
 
     const { annee, mois } = req.query;
 
-    // Construire la requête pour la maison du résident
+    
     const query = { maisonId: maison._id };
     if (annee) query.annee = parseInt(annee);
     if (mois) query.mois = parseInt(mois);
@@ -404,7 +404,7 @@ const getMyMaisonConsommations = async (req, res) => {
       .populate("residentId", "nom prenom email")
       .sort({ annee: -1, mois: -1, dateReleve: -1, "residentId.nom": 1 });
 
-    // Calculer les statistiques par résident
+    
     const statsParResident = {};
     consommations.forEach((conso) => {
       const rId = conso.residentId._id.toString();
@@ -445,7 +445,7 @@ module.exports = {
   getConsommationsByMaison,
   updateConsommation,
   deleteConsommation,
-  // Nouvelles fonctions pour les résidents
+  
   getMyConsommations,
   getMyMaisonConsommations,
 };

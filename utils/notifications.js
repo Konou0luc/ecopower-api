@@ -3,7 +3,7 @@ const Abonnement = require('../models/Abonnement');
 const Facture = require('../models/Facture');
 const admin = require('../config/firebase');
 
-// Envoyer une notification générique à un résident via FCM
+
 const envoyer = async (residentId, message) => {
   try {
     const resident = await User.findById(residentId);
@@ -18,12 +18,12 @@ const envoyer = async (residentId, message) => {
       return { success: false, error: 'DEVICE_TOKEN_MISSING' };
     }
 
-    // Vérifier la configuration Firebase
+    
     const app = admin.app();
     const projectId = app.options.projectId || app.options.credential?.projectId;
     console.log(`🔧 Firebase Project ID: ${projectId}`);
 
-    // Utiliser la nouvelle API Firebase Admin SDK (v1)
+    
     const messagePayload = {
       notification: {
         title: 'Ecopower',
@@ -69,7 +69,7 @@ const envoyer = async (residentId, message) => {
       stack: error.stack
     });
     
-    // Gestion spécifique des erreurs Firebase
+    
     let errorMessage = error.message;
     if (error.code === 'messaging/invalid-registration-token' || 
         error.code === 'messaging/registration-token-not-registered') {
@@ -90,12 +90,12 @@ const envoyer = async (residentId, message) => {
   }
 };
 
-// Notification d'expiration d'abonnement
+
 const notifySubscriptionExpiry = async () => {
   try {
     console.log('🔔 Vérification des abonnements expirant bientôt...');
     
-    // Trouver les abonnements qui expirent dans les 7 jours
+    
     const dateLimite = new Date();
     dateLimite.setDate(dateLimite.getDate() + 7);
     
@@ -124,12 +124,12 @@ const notifySubscriptionExpiry = async () => {
   }
 };
 
-// Notification de factures en retard
+
 const notifyOverdueInvoices = async () => {
   try {
     console.log('🔔 Vérification des factures en retard...');
     
-    // Trouver les factures en retard (plus de 30 jours)
+    
     const dateLimite = new Date();
     dateLimite.setDate(dateLimite.getDate() - 30);
     
@@ -150,7 +150,7 @@ const notifyOverdueInvoices = async () => {
           console.error('❌ Erreur envoi FCM (overdue):', e);
         }
         
-        // Marquer comme en retard si ce n'est pas déjà fait
+        
         if (facture.statut === 'non payée') {
           facture.statut = 'en retard';
           await facture.save();
@@ -164,7 +164,7 @@ const notifyOverdueInvoices = async () => {
   }
 };
 
-// Notification de nouvelle facture générée
+
 const notifyNewInvoice = async (factureId) => {
   try {
     const facture = await Facture.findById(factureId)
@@ -189,7 +189,7 @@ const notifyNewInvoice = async (factureId) => {
   }
 };
 
-// Notification de paiement reçu
+
 const notifyPaymentReceived = async (factureId) => {
   try {
     const facture = await Facture.findById(factureId)
@@ -219,7 +219,7 @@ const notifyPaymentReceived = async (factureId) => {
   }
 };
 
-// Notification de nouveau résident ajouté
+
 const notifyNewResident = async (residentId, proprietaireId) => {
   try {
     const resident = await User.findById(residentId);
@@ -243,7 +243,7 @@ const notifyNewResident = async (residentId, proprietaireId) => {
   }
 };
 
-// Notification de consommation enregistrée
+
 const notifyConsumptionRecorded = async (consommationId) => {
   try {
     const Consommation = require('../models/Consommation');
@@ -269,7 +269,7 @@ const notifyConsumptionRecorded = async (consommationId) => {
   }
 };
 
-// Notification de quota de résidents atteint
+
 const notifyResidentQuotaReached = async (proprietaireId, quotaActuel, quotaMaximum) => {
   try {
     const proprietaire = await User.findById(proprietaireId);
@@ -292,13 +292,13 @@ const notifyResidentQuotaReached = async (proprietaireId, quotaActuel, quotaMaxi
   }
 };
 
-// Notification de maintenance système
+
 const notifySystemMaintenance = async (message, users = null) => {
   try {
     console.log(`🔧 Notification de maintenance: ${message}`);
 
     if (users) {
-      // Notification à des utilisateurs spécifiques
+      
       for (const userId of users) {
         const user = await User.findById(userId);
         if (user) {
@@ -311,7 +311,7 @@ const notifySystemMaintenance = async (message, users = null) => {
         }
       }
     } else {
-      // Notification à tous les utilisateurs actifs
+      
       const activeUsers = await User.find({ statut: 'active' });
       console.log(`📧 Notification de maintenance envoyée à ${activeUsers.length} utilisateurs`);
       for (const user of activeUsers) {

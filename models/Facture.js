@@ -62,13 +62,13 @@ const factureSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Méthode pour générer un numéro de facture unique
+
 factureSchema.statics.genererNumeroFacture = async function() {
   const date = new Date();
   const annee = date.getFullYear();
   const mois = String(date.getMonth() + 1).padStart(2, '0');
   
-  // Compter les factures du mois
+  
   const count = await this.countDocuments({
     dateEmission: {
       $gte: new Date(annee, date.getMonth(), 1),
@@ -79,14 +79,14 @@ factureSchema.statics.genererNumeroFacture = async function() {
   return `FACT-${annee}${mois}-${String(count + 1).padStart(4, '0')}`;
 };
 
-// Méthode pour marquer comme payée
+
 factureSchema.methods.marquerPayee = function() {
   this.statut = 'payée';
   this.datePaiement = new Date();
   return this.save();
 };
 
-// Méthode pour vérifier si la facture est en retard
+
 factureSchema.methods.verifierRetard = function() {
   if (this.statut === 'non payée' && this.dateEcheance < new Date()) {
     this.statut = 'en retard';
@@ -95,7 +95,7 @@ factureSchema.methods.verifierRetard = function() {
   return Promise.resolve(this);
 };
 
-// Méthode pour calculer les jours de retard
+
 factureSchema.methods.joursRetard = function() {
   if (this.statut === 'payée' || this.dateEcheance >= new Date()) {
     return 0;
@@ -104,12 +104,12 @@ factureSchema.methods.joursRetard = function() {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
-// Configuration pour inclure les virtuals dans les réponses JSON
+
 factureSchema.set('toJSON', {
   virtuals: true
 });
 
-// Index pour optimiser les requêtes
+
 factureSchema.index({ residentId: 1, dateEmission: -1 });
 factureSchema.index({ maisonId: 1, dateEmission: -1 });
 factureSchema.index({ statut: 1, dateEcheance: 1 });

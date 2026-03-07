@@ -629,7 +629,7 @@ const googleAuth = async (req, res) => {
 
 const deleteMyAccount = async (req, res) => {
   try {
-    const { motDePasse } = req.body;
+    const motDePasse = req.body?.motDePasse;
     const userId = req.user._id;
 
     const user = await User.findById(userId);

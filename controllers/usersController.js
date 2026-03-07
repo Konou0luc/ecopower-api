@@ -1,10 +1,6 @@
 const User = require('../models/User');
 
-/**
- * PATCH /users/:id/make-admin
- * Rôle: admin
- * Effet: promeut un utilisateur au rôle admin
- */
+
 const makeAdmin = async (req, res) => {
     try {
         const { id } = req.params;

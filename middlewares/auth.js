@@ -1,10 +1,10 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Middleware pour vérifier le token JWT
+
 const authenticateToken = async (req, res, next) => {
   try {
-    // Log pour déboguer les headers reçus
+    
     console.log('🔍 [AUTH] Headers reçus:', {
       'authorization': req.headers['authorization'] ? 'Présent' : 'Absent',
       'Authorization': req.headers['Authorization'] ? 'Présent' : 'Absent',
@@ -12,9 +12,9 @@ const authenticateToken = async (req, res, next) => {
       'method': req.method
     });
     
-    // Essayer les deux cas (Express normalise normalement en minuscules)
+    
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (!token) {
       console.error('❌ [AUTH] authenticateToken: Aucun token fourni pour', req.method, req.path);
@@ -27,7 +27,7 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('🔐 [AUTH] Token décodé avec succès. userId:', decoded.userId);
     
-    // Récupérer l'utilisateur depuis la base de données
+    
     const user = await User.findById(decoded.userId).select('-motDePasse -refreshToken');
     
     if (!user) {
@@ -52,7 +52,7 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Middleware pour vérifier le rôle propriétaire
+
 const requireProprietaire = (req, res, next) => {
   if (req.user.role !== 'proprietaire') {
     return res.status(403).json({ message: 'Accès réservé aux propriétaires' });
@@ -60,7 +60,7 @@ const requireProprietaire = (req, res, next) => {
   next();
 };
 
-// Middleware pour vérifier le rôle résident
+
 const requireResident = (req, res, next) => {
   if (req.user.role !== 'resident') {
     return res.status(403).json({ message: 'Accès réservé aux résidents' });
@@ -68,15 +68,15 @@ const requireResident = (req, res, next) => {
   next();
 };
 
-// Middleware pour vérifier le rôle admin
+
 const requireAdmin = (req, res, next) => {
-  // Vérifier que req.user existe (doit être défini par authenticateToken)
+  
   if (!req.user) {
     console.error('❌ [AUTH] requireAdmin: req.user n\'est pas défini');
     return res.status(401).json({ message: 'Authentification requise' });
   }
   
-  // Accepter à la fois 'admin' et 'super-admin'
+  
   if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
     console.error('❌ [AUTH] requireAdmin: Rôle insuffisant. Rôle actuel:', req.user.role, 'Email:', req.user.email);
     return res.status(403).json({ 
@@ -90,8 +90,8 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Middleware pour exiger le changement de mot de passe au premier login
-// Autorise la route de reset uniquement si firstLogin === true
+
+
 const requirePasswordChange = (req, res, next) => {
   if (req.user.firstLogin) {
     return next();
@@ -102,7 +102,7 @@ const requirePasswordChange = (req, res, next) => {
   });
 };
 
-// Middleware pour vérifier le refresh token
+
 const authenticateRefreshToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;

@@ -16,7 +16,7 @@ async function testNotification() {
     await mongoose.connect(mongoUri);
     console.log('✅ Connecté à MongoDB\n');
     
-    // Récupérer les arguments de la ligne de commande
+    
     const args = process.argv.slice(2);
     const userId = args[0];
     const message = args[1] || `Notification de test - ${new Date().toLocaleString('fr-FR')}`;
@@ -49,7 +49,7 @@ async function testNotification() {
       process.exit(0);
     }
     
-    // Trouver l'utilisateur
+    
     const user = await User.findById(userId);
     if (!user) {
       console.error(`❌ Utilisateur avec l'ID ${userId} non trouvé`);
@@ -71,10 +71,10 @@ async function testNotification() {
     console.log(`\n📤 Envoi de la notification...`);
     console.log(`   Message: "${message}"\n`);
     
-    // Importer le module de notifications
+    
     const notifications = require('../utils/notifications');
     
-    // Envoyer la notification
+    
     const result = await notifications.envoyer(userId, message);
     
     if (result.success) {

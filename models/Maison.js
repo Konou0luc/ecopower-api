@@ -34,6 +34,12 @@ const maisonSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  nbResidentsMax: {
+    type: Number,
+    required: true,
+    default: 1,
+    min: 1
+  },
   statut: {
     type: String,
     enum: ['active', 'inactive'],
@@ -43,7 +49,7 @@ const maisonSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Méthode pour ajouter un résident
+
 maisonSchema.methods.ajouterResident = function(residentId) {
   if (!this.listeResidents) {
     this.listeResidents = [];
@@ -55,7 +61,7 @@ maisonSchema.methods.ajouterResident = function(residentId) {
   return Promise.resolve(this);
 };
 
-// Méthode pour retirer un résident
+
 maisonSchema.methods.retirerResident = function(residentId) {
   if (!this.listeResidents) {
     this.listeResidents = [];
@@ -64,17 +70,17 @@ maisonSchema.methods.retirerResident = function(residentId) {
   return this.save();
 };
 
-// Méthode pour obtenir le nombre de résidents
+
 maisonSchema.virtual('nbResidents').get(function() {
   return this.listeResidents ? this.listeResidents.length : 0;
 });
 
-// Configuration pour inclure les virtuals dans les réponses JSON
+
 maisonSchema.set('toJSON', {
   virtuals: true
 });
 
-// Index pour optimiser les requêtes
+
 maisonSchema.index({ proprietaireId: 1 });
 maisonSchema.index({ listeResidents: 1 });
 

@@ -45,7 +45,7 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index pour améliorer les performances
+
 notificationSchema.index({ destinataire: 1, createdAt: -1 });
 notificationSchema.index({ statut: 1 });
 notificationSchema.index({ type: 1 });

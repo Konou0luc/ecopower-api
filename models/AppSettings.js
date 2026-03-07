@@ -11,6 +11,8 @@ const appSettingsSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     website: { type: String, default: '' },
     description: { type: String, default: '' },
+    guideRapideUrl: { type: String, default: '' },
+    privacyPolicyUrl: { type: String, default: '' },
   },
   { timestamps: true }
 );
