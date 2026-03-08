@@ -196,6 +196,7 @@ const refreshToken = async (req, res) => {
 const logout = async (req, res) => {
   try {
     req.user.refreshToken = null;
+    req.user.deviceToken = null;
     await req.user.save();
 
     res.json({ message: 'Déconnexion réussie' });
@@ -347,6 +348,12 @@ const setDeviceToken = async (req, res) => {
     if (!deviceToken || typeof deviceToken !== 'string') {
       return res.status(400).json({ message: 'deviceToken requis' });
     }
+
+    // Retirer ce deviceToken de tout autre compte existant pour éviter les envois en double sur un appareil
+    await User.updateMany(
+      { deviceToken: deviceToken, _id: { $ne: req.user._id } },
+      { $set: { deviceToken: null } }
+    );
 
     req.user.deviceToken = deviceToken;
     await req.user.save();

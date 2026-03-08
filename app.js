@@ -131,7 +131,7 @@ const connectDB = async () => {
     console.log('Mongo connecté');
     try {
       await mongoose.connection.collection('consommations').dropIndex('residentId_1_maisonId_1_mois_1_annee_1');
-      console.log('🚀 Index unique problématique (residentId_1_maisonId_1_mois_1_annee_1) supprimé avec succès');
+      console.log('Index unique problématique (residentId_1_maisonId_1_mois_1_annee_1) supprimé avec succès');
     } catch (e) {
     }
   } catch (error) {
