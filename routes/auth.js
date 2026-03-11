@@ -20,7 +20,8 @@ router.post('/logout', authenticateToken, authController.logout);
 
 router.post('/reset-password', authenticateToken, requirePasswordChange, authController.resetPassword);
 
-router.post('/change-password', authenticateToken, authController.changePassword);
+// Back-office only: changement de mot de passe réservé aux admins
+router.post('/change-password', authenticateToken, requireAdmin, authController.changePassword);
 
 router.post('/forgot-password', authController.forgotPassword);
 

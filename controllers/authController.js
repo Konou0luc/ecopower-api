@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Abonnement = require('../models/Abonnement');
-const { generateTemporaryPassword } = require('../utils/passwordUtils');
+const { generateTemporaryPassword, validatePasswordStrength } = require('../utils/passwordUtils');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -25,6 +25,16 @@ const generateTokens = (userId) => {
 const register = async (req, res) => {
   try {
     const { nom, prenom, email, telephone, motDePasse, role } = req.body;
+
+    if (motDePasse) {
+      const strength = validatePasswordStrength(motDePasse.toString());
+      if (!strength.isValid) {
+        return res.status(400).json({
+          message: 'Le mot de passe ne respecte pas la politique de sécurité',
+          errors: strength.errors,
+        });
+      }
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -75,7 +85,11 @@ const FREE_MODE = process.env.FREE_MODE === 'true';
 const login = async (req, res) => {
   try {
     console.log('🔐 [LOGIN] Tentative de connexion reçue');
-    console.log('🔐 [LOGIN] Body:', JSON.stringify(req.body));
+    const safeBody = { ...req.body };
+    if (safeBody.motDePasse) {
+      safeBody.motDePasse = '***redacted***';
+    }
+    console.log('🔐 [LOGIN] Body (sanitised):', JSON.stringify(safeBody));
     console.log('🔐 [LOGIN] Headers:', JSON.stringify(req.headers));
     
     const { email, motDePasse } = req.body;
@@ -214,6 +228,14 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Cette opération n\'est pas nécessaire' });
     }
 
+    const strength = validatePasswordStrength(nouveauMotDePasse || '');
+    if (!strength.isValid) {
+      return res.status(400).json({
+        message: 'Le mot de passe ne respecte pas la politique de sécurité',
+        errors: strength.errors,
+      });
+    }
+
     req.user.motDePasse = nouveauMotDePasse;
     req.user.firstLogin = false;
     await req.user.save();
@@ -237,9 +259,23 @@ const changePassword = async (req, res) => {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
+    if (user.authMethod === 'google' || !user.motDePasse) {
+      return res.status(400).json({
+        message: 'Ce compte utilise Google Sign-In. Le changement de mot de passe n’est pas disponible.',
+      });
+    }
+
     const isPasswordValid = await user.comparePassword(motDePasseActuel);
     if (!isPasswordValid) {
       return res.status(400).json({ message: 'Mot de passe actuel incorrect' });
+    }
+
+    const strength = validatePasswordStrength(nouveauMotDePasse || '');
+    if (!strength.isValid) {
+      return res.status(400).json({
+        message: 'Le nouveau mot de passe ne respecte pas la politique de sécurité',
+        errors: strength.errors,
+      });
     }
 
     user.motDePasse = nouveauMotDePasse;
