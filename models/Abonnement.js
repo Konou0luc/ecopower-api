@@ -11,7 +11,12 @@ const abonnementSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  nbResidentsMax: {
+  nbResidentsParMaisonMax: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  nbMaisonsMax: {
     type: Number,
     required: true,
     min: 1

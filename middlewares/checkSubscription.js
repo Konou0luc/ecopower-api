@@ -54,38 +54,83 @@ const checkSubscription = async (req, res, next) => {
 
 const checkResidentQuota = async (req, res, next) => {
   try {
+    const defaultNbResidentsParMaison = 2; // For FREE_MODE
+    const limit = (FREE_MODE || !req.abonnement) ? defaultNbResidentsParMaison : req.abonnement.nbResidentsParMaisonMax;
+
     if (FREE_MODE) {
-      return next();
-    }
-    if (!req.abonnement) {
+      // In free mode, we still need to check the quota for the house
+    } else if (!req.abonnement) {
       return res.status(403).json({ 
         message: 'Abonnement requis pour cette opération' 
       });
     }
 
-    
-    const User = require('../models/User');
-    const nbResidentsActuels = await User.countDocuments({
-      idProprietaire: req.user._id,
-      role: 'resident'
-    });
+    const { maisonId } = req.body;
+    if (!maisonId) {
+      return res.status(400).json({ message: 'maisonId requis pour vérifier le quota de résidents' });
+    }
 
+    const Maison = require('../models/Maison');
+    const maison = await Maison.findById(maisonId);
     
-    if (nbResidentsActuels >= req.abonnement.nbResidentsMax) {
+    if (!maison) {
+      return res.status(404).json({ message: 'Maison non trouvée' });
+    }
+
+    const nbResidentsActuels = maison.listeResidents.length;
+
+    if (nbResidentsActuels >= limit) {
       return res.status(403).json({ 
-        message: `Quota de résidents atteint (${req.abonnement.nbResidentsMax} maximum)`,
+        message: `Quota de résidents atteint pour cette maison (${limit} maximum)`,
         error: 'QUOTA_EXCEEDED',
         quotaActuel: nbResidentsActuels,
-        quotaMaximum: req.abonnement.nbResidentsMax
+        quotaMaximum: limit
       });
     }
 
     req.nbResidentsActuels = nbResidentsActuels;
     next();
   } catch (error) {
-    console.error('Erreur lors de la vérification du quota:', error);
+    console.error('Erreur lors de la vérification du quota de résidents:', error);
     return res.status(500).json({ 
-      message: 'Erreur lors de la vérification du quota' 
+      message: 'Erreur lors de la vérification du quota de résidents' 
+    });
+  }
+};
+
+const checkMaisonQuota = async (req, res, next) => {
+  try {
+    const defaultNbMaisonsMax = 1; // For FREE_MODE
+    const limit = (FREE_MODE || !req.abonnement) ? defaultNbMaisonsMax : req.abonnement.nbMaisonsMax;
+
+    if (FREE_MODE) {
+      // In free mode, we still need to check the quota for the house
+    } else if (!req.abonnement) {
+      return res.status(403).json({ 
+        message: 'Abonnement requis pour cette opération' 
+      });
+    }
+
+    const Maison = require('../models/Maison');
+    const nbMaisonsActuelles = await Maison.countDocuments({
+      proprietaireId: req.user._id
+    });
+
+    if (nbMaisonsActuelles >= limit) {
+      return res.status(403).json({ 
+        message: `Quota de maisons atteint (${limit} maximum)`,
+        error: 'QUOTA_EXCEEDED',
+        quotaActuel: nbMaisonsActuelles,
+        quotaMaximum: limit
+      });
+    }
+
+    req.nbMaisonsActuelles = nbMaisonsActuelles;
+    next();
+  } catch (error) {
+    console.error('Erreur lors de la vérification du quota de maisons:', error);
+    return res.status(500).json({ 
+      message: 'Erreur lors de la vérification du quota de maisons' 
     });
   }
 };
@@ -121,5 +166,6 @@ const checkSubscriptionExpiry = async (req, res, next) => {
 module.exports = {
   checkSubscription,
   checkResidentQuota,
+  checkMaisonQuota,
   checkSubscriptionExpiry
 };

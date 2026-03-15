@@ -25,10 +25,10 @@ async function createAdmin() {
 
     const adminData = {
       nom: 'Admin',
-      prenom: 'System',
-      email: 'admin@ecopower.com',
+      prenom: 'Luc',
+      email: 'ecopowerafrique@gmail.com',
       telephone: '+22897240460',
-      motDePasse: 'Admin123!',
+      motDePasse: '!U57X"@6P&`xX:|Akjdt',
       role: 'admin',
       authMethod: 'email'
     };

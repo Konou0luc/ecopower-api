@@ -9,46 +9,48 @@ const getOffres = async (req, res) => {
       {
         type: 'basic',
         nom: 'Basic',
-        prix: 500,
-        nbResidentsMax: 5,
+        prix: 1000,
+        nbResidentsParMaisonMax: 5,
+        nbMaisonsMax: 2,
         description: 'Idéal pour les petites propriétés',
         fonctionnalites: [
-          'Gestion jusqu\'à 5 résidents',
+          'Gestion jusqu\'à 2 maisons',
+          'Gestion jusqu\'à 5 résidents par maison',
           'Génération de factures',
           'Historique des consommations',
-          'Notifications WhatsApp'
+          'Notifications via l\'application'
         ]
       },
       {
         type: 'premium',
         nom: 'Premium',
-        prix: 1000,
-        nbResidentsMax: 15,
+        prix: 2000,
+        nbResidentsParMaisonMax: 7,
+        nbMaisonsMax: 3,
         description: 'Parfait pour les propriétés moyennes',
         fonctionnalites: [
-          'Gestion jusqu\'à 15 résidents',
+          'Gestion jusqu\'à 3 maisons',
+          'Gestion jusqu\'à 7 résidents par maison',
           'Génération de factures',
           'Historique des consommations',
-          'Notifications WhatsApp',
-          'Statistiques avancées',
+          'Notifications  via l\'application',
           'Support prioritaire'
         ]
       },
       {
         type: 'enterprise',
         nom: 'Enterprise',
-        prix: 2000,
-        nbResidentsMax: 50,
+        prix: 5000,
+        nbResidentsParMaisonMax: 10,
+        nbMaisonsMax: 4,
         description: 'Pour les grandes propriétés',
         fonctionnalites: [
-          'Gestion jusqu\'à 50 résidents',
+          'Gestion jusqu\'à 4 maisons',
+          'Gestion jusqu\'à 10 résidents par maison',
           'Génération de factures',
           'Historique des consommations',
-          'Notifications WhatsApp',
-          'Statistiques avancées',
-          'Support prioritaire',
-          'API personnalisée',
-          'Formation incluse'
+          'Notifications via l\'application',
+          'Support prioritaire'
         ]
       }
     ];
@@ -90,9 +92,9 @@ const souscrire = async (req, res) => {
 
     
     const offres = {
-      basic: { prix: 500, nbResidentsMax: 5 },
-      premium: { prix: 1000, nbResidentsMax: 15 },
-      enterprise: { prix: 2000, nbResidentsMax: 50 }
+      basic: { prix: 1000, nbResidentsParMaisonMax: 5, nbMaisonsMax: 2 },
+      premium: { prix: 2000, nbResidentsParMaisonMax: 7, nbMaisonsMax: 3 },
+      enterprise: { prix: 5000, nbResidentsParMaisonMax: 10, nbMaisonsMax: 4 }
     };
 
     const offre = offres[type];
@@ -109,7 +111,8 @@ const souscrire = async (req, res) => {
     const abonnement = new Abonnement({
       type,
       prix: offre.prix,
-      nbResidentsMax: offre.nbResidentsMax,
+      nbResidentsParMaisonMax: offre.nbResidentsParMaisonMax,
+      nbMaisonsMax: offre.nbMaisonsMax,
       dateDebut,
       dateFin,
       statut: 'actif',
@@ -149,7 +152,8 @@ const renouveler = async (req, res) => {
           isActive: true,
           dateDebut: now,
           dateFin: future,
-          nbResidentsMax: 9999,
+          nbResidentsParMaisonMax: 2,
+          nbMaisonsMax: 1,
         },
         success: true,
       });
@@ -242,8 +246,8 @@ const getAbonnementActuel = async (req, res) => {
     res.json({
       abonnement,
       statistiques: {
-        nbResidentsActuels,
-        nbResidentsMax: abonnement.nbResidentsMax,
+        nbMaisonsMax: abonnement.nbMaisonsMax,
+        nbResidentsParMaisonMax: abonnement.nbResidentsParMaisonMax,
         joursRestants: abonnement.joursRestants(),
         isActif: isActif
       }

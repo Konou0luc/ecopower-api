@@ -2,14 +2,16 @@ const express = require('express');
 const router = express.Router();
 const maisonsController = require('../controllers/maisonsController');
 const { authenticateToken } = require('../middlewares/auth');
+const { checkSubscription, checkMaisonQuota } = require('../middlewares/checkSubscription');
 
 router.get('/:id/full', authenticateToken, maisonsController.getMaisonById);
 
-
 router.use(authenticateToken);
 
-
-router.post('/', maisonsController.createMaison);
+// Appliquer checkSubscription globalement pour les proprios, 
+// mais on le fera finement vu que les résidents accèdent aussi à certaines routes.
+// Pour la création, c'est que proprio de toute façon.
+router.post('/', checkSubscription, checkMaisonQuota, maisonsController.createMaison);
 
 
 router.get('/', maisonsController.getMaisons);
