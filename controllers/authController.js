@@ -520,11 +520,52 @@ const googleAuth = async (req, res) => {
       }
 
       if (user.googleId !== googleId) {
-        return res.status(400).json({ 
-          message: 'Cet email est associé à un autre compte Google' 
+        return res.status(400).json({
+          message: 'Cet email est associé à un autre compte Google'
         });
       }
 
+      // Résident sans maison → ne pas le connecter, renvoyer needsRegistration pour flux gérant
+      if (user.role === 'resident') {
+        const Maison = require('../models/Maison');
+        const maisonResident = await Maison.findOne({ listeResidents: user._id });
+        if (!maisonResident) {
+          const finalNomForOwner =
+            nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
+          const finalPrenomForOwner =
+            prenom ||
+            googleGivenName ||
+            googleName.split(' ').slice(0, -1).join(' ') ||
+            googleName ||
+            '';
+          return res.status(200).json({
+            message: 'Informations supplémentaires requises pour créer un compte propriétaire',
+            needsRegistration: true,
+            googleData: {
+              email: email,
+              nom: finalNomForOwner,
+              prenom: finalPrenomForOwner,
+              googleId: googleId,
+            },
+            requiredFields: ['telephone'],
+          });
+        }
+        // Résident avec maison : connexion normale
+        const { accessToken, refreshToken } = generateTokens(user._id);
+        user.refreshToken = refreshToken;
+        await user.save();
+        console.log('✅ [GOOGLE AUTH] Connexion résident réussie pour:', user.email);
+        return res.json({
+          message: 'Connexion réussie',
+          user,
+          accessToken,
+          refreshToken,
+          abonnement: null,
+          needsRegistration: false,
+        });
+      }
+
+      // Propriétaire (ou admin)
       const { accessToken, refreshToken } = generateTokens(user._id);
       user.refreshToken = refreshToken;
       await user.save();
@@ -567,6 +608,38 @@ const googleAuth = async (req, res) => {
     });
 
     if (existingResident) {
+      // Vérifier si ce résident est déjà rattaché à une maison
+      const Maison = require('../models/Maison');
+      const maisonResident = await Maison.findOne({ listeResidents: existingResident._id });
+
+      if (!maisonResident) {
+        // Cas particulier :
+        // - le résident existe en base mais n'est rattaché à aucune maison
+        // - dans l'app mobile, ce scénario doit être traité comme une
+        //   création de compte gérant plutôt qu'une connexion résident bloquée
+        const finalNomForOwner =
+          nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
+        const finalPrenomForOwner =
+          prenom ||
+          googleGivenName ||
+          googleName.split(' ').slice(0, -1).join(' ') ||
+          googleName ||
+          '';
+
+        return res.status(200).json({
+          message:
+            'Informations supplémentaires requises pour créer un compte propriétaire',
+          needsRegistration: true,
+          googleData: {
+            email: email,
+            nom: finalNomForOwner,
+            prenom: finalPrenomForOwner,
+            googleId: googleId,
+          },
+          requiredFields: ['telephone'],
+        });
+      }
+
       if (!existingResident.googleId) {
         existingResident.googleId = googleId;
         existingResident.authMethod = 'google';
@@ -574,8 +647,8 @@ const googleAuth = async (req, res) => {
       }
 
       if (existingResident.googleId !== googleId) {
-        return res.status(400).json({ 
-          message: 'Cet email est associé à un autre compte Google' 
+        return res.status(400).json({
+          message: 'Cet email est associé à un autre compte Google',
         });
       }
 
@@ -583,7 +656,10 @@ const googleAuth = async (req, res) => {
       existingResident.refreshToken = refreshToken;
       await existingResident.save();
 
-      console.log('✅ [GOOGLE AUTH] Connexion résident réussie pour:', existingResident.email);
+      console.log(
+        '✅ [GOOGLE AUTH] Connexion résident réussie pour:',
+        existingResident.email
+      );
 
       return res.json({
         message: 'Connexion réussie',
@@ -591,7 +667,7 @@ const googleAuth = async (req, res) => {
         accessToken,
         refreshToken,
         abonnement: null,
-        needsRegistration: false
+        needsRegistration: false,
       });
     }
 
