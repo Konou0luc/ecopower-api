@@ -87,8 +87,8 @@ const addResident = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    // Quota check exception for the developer (ecopowerafrique@gmail.com)
-    const effectiveNbResidentsMax = (req.user && req.user.email === 'ecopowerafrique@gmail.com') 
+    // Quota check exception for the developer (konouluc1@gmail.com)
+    const effectiveNbResidentsMax = (req.user && req.user.email === 'konouluc1@gmail.com') 
       ? Math.max(maison.nbResidentsMax || 0, 6) 
       : maison.nbResidentsMax;
 

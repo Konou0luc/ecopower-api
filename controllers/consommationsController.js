@@ -49,8 +49,8 @@ const addConsommation = async (req, res) => {
     }
 
     
-    // Quota check exception for the developer (ecopowerafrique@gmail.com)
-    const effectiveMaxReleves = (req.user && req.user.email === 'ecopowerafrique@gmail.com') ? 10 : 2;
+    // Quota check exception for the developer (konouluc1@gmail.com)
+    const effectiveMaxReleves = (req.user && req.user.email === 'konouluc1@gmail.com') ? 10 : 2;
 
     const countReleves = await Consommation.countDocuments({
       residentId,
