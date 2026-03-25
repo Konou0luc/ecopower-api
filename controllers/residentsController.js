@@ -87,13 +87,17 @@ const addResident = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
+    // Quota check exception for the developer (ecopowerafrique@gmail.com)
+    const effectiveNbResidentsMax = (req.user && req.user.email === 'ecopowerafrique@gmail.com') 
+      ? Math.max(maison.nbResidentsMax || 0, 6) 
+      : maison.nbResidentsMax;
+
     if (
-      typeof maison.nbResidentsMax === 'number' &&
-      maison.nbResidentsMax > 0 &&
-      maison.listeResidents.length >= maison.nbResidentsMax
+      effectiveNbResidentsMax > 0 &&
+      maison.listeResidents.length >= effectiveNbResidentsMax
     ) {
       return res.status(400).json({
-        message: `Nombre maximal de résidents atteint pour cette maison (${maison.nbResidentsMax})`
+        message: `Nombre maximal de résidents atteint pour cette maison (${effectiveNbResidentsMax})`
       });
     }
 

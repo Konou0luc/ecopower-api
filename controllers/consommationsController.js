@@ -49,15 +49,18 @@ const addConsommation = async (req, res) => {
     }
 
     
+    // Quota check exception for the developer (ecopowerafrique@gmail.com)
+    const effectiveMaxReleves = (req.user && req.user.email === 'ecopowerafrique@gmail.com') ? 10 : 2;
+
     const countReleves = await Consommation.countDocuments({
       residentId,
       maisonId,
       mois,
       annee,
     });
-    if (countReleves >= 2) {
+    if (countReleves >= effectiveMaxReleves) {
       return res.status(400).json({
-        message: "Limite atteinte : maximum 2 relevés par mois pour ce résident",
+        message: `Limite atteinte : maximum ${effectiveMaxReleves} relevés par mois pour ce résident`,
         count: countReleves,
       });
     }

@@ -54,7 +54,13 @@ const checkSubscription = async (req, res, next) => {
 
 const checkResidentQuota = async (req, res, next) => {
   try {
-    const defaultNbResidentsParMaison = 2; // For FREE_MODE
+    let defaultNbResidentsParMaison = 2; // For FREE_MODE
+
+    // Développeur exception: allow 6 residents
+    if (req.user && req.user.email === 'ecopowerafrique@gmail.com') {
+      defaultNbResidentsParMaison = 6;
+    }
+
     const limit = (FREE_MODE || !req.abonnement) ? defaultNbResidentsParMaison : req.abonnement.nbResidentsParMaisonMax;
 
     if (FREE_MODE) {
@@ -100,7 +106,13 @@ const checkResidentQuota = async (req, res, next) => {
 
 const checkMaisonQuota = async (req, res, next) => {
   try {
-    const defaultNbMaisonsMax = 1; // For FREE_MODE
+    let defaultNbMaisonsMax = 1; // For FREE_MODE
+
+    // Développeur exception: allow 6 houses
+    if (req.user && req.user.email === 'ecopowerafrique@gmail.com') {
+      defaultNbMaisonsMax = 6;
+    }
+
     const limit = (FREE_MODE || !req.abonnement) ? defaultNbMaisonsMax : req.abonnement.nbMaisonsMax;
 
     if (FREE_MODE) {
