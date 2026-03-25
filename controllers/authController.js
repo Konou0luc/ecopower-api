@@ -61,6 +61,23 @@ const register = async (req, res) => {
 
     await user.save();
 
+    if (user.role === 'resident' && !user.maisonId) {
+      console.log('❌ [LOGIN] Résident sans maisonId en base, tentative de récupération via Maison collection...');
+      const Maison = require('../models/Maison');
+      const maison = await Maison.findOne({ listeResidents: user._id });
+      if (maison) {
+        user.maisonId = maison._id;
+        await user.save();
+        console.log('✅ [LOGIN] maisonId récupéré et mis à jour pour le résident');
+      } else {
+        console.log('❌ [LOGIN] Résident vraiment non rattaché à une maison:', normalizedEmail);
+        return res.status(403).json({ 
+          message: 'Votre compte n\'est associé à aucune maison. Veuillez contacter votre gérant pour être ajouté avant de vous connecter.',
+          error: 'NO_HOUSE_ASSOCIATED'
+        });
+      }
+    }
+
     const { accessToken, refreshToken } = generateTokens(user._id);
 
     user.refreshToken = refreshToken;
