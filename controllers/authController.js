@@ -546,6 +546,7 @@ const googleAuth = async (req, res) => {
       if (user.role === 'resident') {
         const Maison = require('../models/Maison');
         const maisonResident = await Maison.findOne({ listeResidents: user._id });
+        
         if (!maisonResident) {
           const finalNomForOwner =
             nom || googleFamilyName || googleName.split(' ').slice(-1).join(' ') || '';
@@ -567,6 +568,14 @@ const googleAuth = async (req, res) => {
             requiredFields: ['telephone'],
           });
         }
+
+        // Si le résident est trouvé dans une maison mais n'a pas son maisonId renseigné
+        if (!user.maisonId) {
+          user.maisonId = maisonResident._id;
+          await user.save();
+          console.log('✅ [GOOGLE AUTH] maisonId mis à jour pour le résident:', email);
+        }
+
         // Résident avec maison : connexion normale
         const { accessToken, refreshToken } = generateTokens(user._id);
         user.refreshToken = refreshToken;
@@ -661,6 +670,13 @@ const googleAuth = async (req, res) => {
         existingResident.googleId = googleId;
         existingResident.authMethod = 'google';
         await existingResident.save();
+      }
+
+      // Si le résident est trouvé dans une maison mais n'a pas son maisonId renseigné
+      if (!existingResident.maisonId) {
+        existingResident.maisonId = maisonResident._id;
+        await existingResident.save();
+        console.log('✅ [GOOGLE AUTH] maisonId mis à jour pour le résident existant:', email);
       }
 
       if (existingResident.googleId !== googleId) {

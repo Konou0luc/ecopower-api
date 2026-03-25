@@ -11,7 +11,13 @@ const getMaisonById = async (req, res) => {
     if (!maison) {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
-    res.json(maison);
+
+    const maisonObj = maison.toObject();
+    if (maisonObj.listeResidents) {
+      maisonObj.listeResidents = maisonObj.listeResidents.filter(r => r !== null && typeof r === 'object' && (r.email || r.nom));
+    }
+
+    res.json(maisonObj);
   } catch (error) {
     console.error('💥 [API] getMaisonById error:', error);
     res.status(500).json({ message: 'Erreur lors de la récupération de la maison' });
@@ -63,11 +69,28 @@ const getMaisons = async (req, res) => {
         .sort({ createdAt: -1 });
     } else {
       
-      maisons = await Maison.find({ listeResidents: req.user._id })
+      // Recherche de la maison où le résident est présent dans listeResidents
+      // On utilise $in pour être sûr de bien chercher l'ID
+      maisons = await Maison.find({ 
+        $or: [
+          { listeResidents: req.user._id },
+          { listeResidents: req.user._id.toString() }
+        ]
+      })
         .populate('proprietaireId', 'nom prenom email')
         .populate('listeResidents', 'nom prenom email telephone')
         .sort({ createdAt: -1 });
     }
+
+    // Filtrage pour s'assurer que les résidents populés sont valides (non nulls et bien des objets)
+    maisons = maisons.map(maison => {
+      const maisonObj = (typeof maison.toObject === 'function') ? maison.toObject() : maison;
+      if (maisonObj.listeResidents) {
+        // On ne garde que les résidents qui ont été populés avec succès (objets avec un email ou un nom)
+        maisonObj.listeResidents = maisonObj.listeResidents.filter(r => r !== null && typeof r === 'object' && (r.email || r.nom));
+      }
+      return maisonObj;
+    });
 
     res.json({
       maisons,
@@ -93,7 +116,10 @@ const getMaison = async (req, res) => {
     } else {
       maison = await Maison.findOne({
         _id: id,
-        listeResidents: req.user._id
+        $or: [
+          { listeResidents: req.user._id },
+          { listeResidents: req.user._id.toString() }
+        ]
       }).populate('proprietaireId', 'nom prenom email')
         .populate('listeResidents', 'nom prenom email telephone');
     }
@@ -102,7 +128,12 @@ const getMaison = async (req, res) => {
       return res.status(404).json({ message: 'Maison non trouvée' });
     }
 
-    res.json({ maison });
+    const maisonObj = (typeof maison.toObject === 'function') ? maison.toObject() : maison;
+    if (maisonObj.listeResidents) {
+      maisonObj.listeResidents = maisonObj.listeResidents.filter(r => r !== null && typeof r === 'object' && (r.email || r.nom));
+    }
+
+    res.json({ maison: maisonObj });
   } catch (error) {
     console.error('Erreur lors de la récupération de la maison:', error);
     res.status(500).json({ message: 'Erreur lors de la récupération de la maison' });
